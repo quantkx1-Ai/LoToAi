@@ -1,0 +1,73 @@
+name: Build Android (.AAB/.APK) & iOS App
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Android (.APK & .AAB cho CH Play)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Capacitor & Package www/
+        run: |
+          npm install
+          npm run build
+          npx cap add android || npx cap sync android
+
+      - name: Build APK & AAB via Gradle
+        working-directory: ./android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug bundleRelease
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LotoAI-Pro-Android-APK
+          path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: Upload Google Play AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LotoAI-Pro-GooglePlay-AAB
+          path: android/app/build/outputs/bundle/release/*.aab
+
+  build-ios:
+    name: Build iOS Project (Xcode on macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate iOS Xcode Project
+        run: |
+          npm install
+          npm run build
+          npx cap add ios || npx cap sync ios
+
+      - name: Upload iOS Xcode Project Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LotoAI-Pro-iOS-Xcode-Project
+          path: ios/
