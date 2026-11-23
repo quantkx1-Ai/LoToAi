@@ -1,7 +1,7 @@
 {
-  "name": "LotoAI Pro - Thống Kê & Phân Tích Xác Suất Xổ Số",
+  "name": "LotoAI Pro - Thống Kê & Phân Tích Xác Suất XSMB",
   "short_name": "LotoAI Pro",
-  "description": "Ứng dụng tra cứu kết quả xổ số và phân tích thống kê tất định 10 thuật toán toán học",
+  "description": "Ứng dụng tra cứu kết quả Xổ Số Miền Bắc (XSMB) thật 100% và phân tích thống kê tất định 10 thuật toán toán học",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b1120",

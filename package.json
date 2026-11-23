@@ -1,7 +1,7 @@
 {
   "name": "loto-ai-pro",
   "version": "1.0.0",
-  "description": "Ứng dụng Tra cứu KQXS & Phân tích Thống kê Xác suất 10 Thuật toán (Android & iOS)",
+  "description": "Ứng dụng Tra cứu KQXS Miền Bắc (XSMB) & Phân tích Thống kê Xác suất 10 Thuật toán (Android & iOS)",
   "main": "index.html",
   "scripts": {
     "build": "node build-www.js",

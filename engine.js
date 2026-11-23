@@ -1,28 +1,65 @@
 /**
- * LotoAI Pro - 100% Deterministic Lottery Statistical & AI Ensemble Engine
- * Supports Live Internet Sync (GitHub Raw XSMB JSON API & XSKT RSS Feeds)
- * + Full 27-Prize Result Board (Giải ĐB -> Giải 7/8) & Loto Đầu/Đuôi Table.
+ * LotoAI Pro - 100% Real-Data XSMB & Deterministic 10-Algorithm Statistical Engine
+ * - Chỉ hỗ trợ Xổ Số Miền Bắc (XSMB), sử dụng 100% kết quả quay thưởng thật từ Internet.
+ * - Không bao giờ tự tạo hoặc bịa kết quả giả nếu chưa có KQXS thật.
+ * - Tuyệt đối không dùng Math.random(): cùng kỳ KQXS + cùng bộ % => kết quả giống nhau 100%.
  */
 
 (function (global) {
   'use strict';
 
-  // Live Internet Endpoints (CORS-enabled)
   const LIVE_ENDPOINTS = {
     xsmb_json: 'https://raw.githubusercontent.com/khiemdoan/vietnam-lottery-xsmb-analysis/refs/heads/main/data/xsmb.json',
-    xsmb_rss: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://xskt.com.vn/rss-feed/mien-bac-xsmb.rss'),
-    xsmn_rss: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://xskt.com.vn/rss-feed/tp-hcm-xshcm.rss'),
-    xsmt_rss: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://xskt.com.vn/rss-feed/da-nang-xsdng.rss')
+    xsmb_today: 'https://api-xsmb-today.onrender.com/api/v1',
+    xsmb_rss: 'https://xskt.com.vn/rss-feed/mien-bac-xsmb.rss',
+    local_rss_proxy: '/api/xsmb-rss'
   };
+
+  const REAL_CACHE_KEY = 'LOTO_AI_REAL_XSMB_V2';
+  const LEGACY_CACHE_KEYS = [
+    'LOTO_AI_LIVE_CACHE_xsmb',
+    'LOTO_AI_LIVE_CACHE_xsmn',
+    'LOTO_AI_LIVE_CACHE_xsmt'
+  ];
+
+  // Cấu trúc 27 giải chuẩn XSMB
+  const XSMB_PRIZE_SPEC = [
+    { key: 'G0', count: 1, digits: 5 },
+    { key: 'G1', count: 1, digits: 5 },
+    { key: 'G2', count: 2, digits: 5 },
+    { key: 'G3', count: 6, digits: 5 },
+    { key: 'G4', count: 4, digits: 4 },
+    { key: 'G5', count: 6, digits: 4 },
+    { key: 'G6', count: 3, digits: 3 },
+    { key: 'G7', count: 4, digits: 2 }
+  ];
+
+  function pad2(n) {
+    const v = parseInt(n, 10) || 0;
+    return v < 10 ? '0' + v : '' + (v % 100);
+  }
+
+  function reverse2(str2) {
+    const s = String(str2).padStart(2, '0');
+    return s[1] + s[0];
+  }
+
+  function bongDuongDigit(d) {
+    return (d + 5) % 10;
+  }
+
+  const BONG_AM_MAP = { 0: 7, 7: 0, 1: 4, 4: 1, 2: 9, 9: 2, 3: 6, 6: 3, 5: 8, 8: 5 };
+  function bongAmDigit(d) {
+    return BONG_AM_MAP[d];
+  }
 
   /**
    * Computes exact Vietnam time (GMT+7) and applies the 18:35 daily lottery cutoff rule:
-   * - Before 18:35:00 -> Latest draw is Yesterday; AI predicts for Today (18:35).
-   * - At or after 18:35:00 -> Latest draw is Today; AI predicts for Tomorrow (18:35).
+   * - Before 18:35:00 -> Latest draw is Yesterday; AI analyzes for Today (18:35).
+   * - At or after 18:35:00 -> Latest expected draw is Today; AI analyzes for Tomorrow (18:35).
    */
   function getVietnamClockInfo(nowDate) {
     const now = nowDate ? new Date(nowDate) : new Date();
-    // Convert to UTC+7 timestamp
     const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
     const vnNow = new Date(utcMs + 7 * 3600000);
 
@@ -30,9 +67,11 @@
     const mm = pad2(vnNow.getMonth() + 1);
     const dd = pad2(vnNow.getDate());
     const todayStr = `${yyyy}-${mm}-${dd}`;
+    const todayDow = vnNow.getDay();
 
     const vnYesterday = new Date(vnNow.getTime() - 86400000);
     const yesterdayStr = `${vnYesterday.getFullYear()}-${pad2(vnYesterday.getMonth() + 1)}-${pad2(vnYesterday.getDate())}`;
+    const yesterdayDow = vnYesterday.getDay();
 
     const vnTomorrow = new Date(vnNow.getTime() + 86400000);
     const tomorrowStr = `${vnTomorrow.getFullYear()}-${pad2(vnTomorrow.getMonth() + 1)}-${pad2(vnTomorrow.getDate())}`;
@@ -46,12 +85,9 @@
     const cutoffSeconds = 18 * 3600 + 35 * 60; // 18:35:00
     const isAfter1835 = currentSecondsOfDay >= cutoffSeconds;
 
-    let secondsUntil1835;
-    if (!isAfter1835) {
-      secondsUntil1835 = cutoffSeconds - currentSecondsOfDay;
-    } else {
-      secondsUntil1835 = (24 * 3600 - currentSecondsOfDay) + cutoffSeconds;
-    }
+    const secondsUntil1835 = !isAfter1835
+      ? cutoffSeconds - currentSecondsOfDay
+      : (24 * 3600 - currentSecondsOfDay) + cutoffSeconds;
 
     const remH = Math.floor(secondsUntil1835 / 3600);
     const remM = Math.floor((secondsUntil1835 % 3600) / 60);
@@ -59,9 +95,12 @@
     const countdownStr = `${pad2(remH)}:${pad2(remM)}:${pad2(remS)}`;
 
     return {
+      year: yyyy,
       todayStr,
       yesterdayStr,
       tomorrowStr,
+      todayDow,
+      yesterdayDow,
       timeStr,
       isAfter1835,
       expectedLatestDrawDate: isAfter1835 ? todayStr : yesterdayStr,
@@ -165,91 +204,67 @@
     }
   ];
 
-  function hashString(str) {
-    let h = 2166136261 >>> 0;
-    for (let i = 0; i < str.length; i++) {
-      h ^= str.charCodeAt(i);
-      h = Math.imul(h, 16777619);
+  /**
+   * Validates and normalizes an XSMB prize table (must contain all 27 valid numeric prizes).
+   */
+  function normalizeXsmbPrizeTable(rawPt) {
+    if (!rawPt || typeof rawPt !== 'object') return null;
+    const normalized = {};
+    for (const spec of XSMB_PRIZE_SPEC) {
+      const arr = rawPt[spec.key];
+      if (!Array.isArray(arr) || arr.length !== spec.count) return null;
+      const cleanArr = [];
+      for (const item of arr) {
+        if (item === null || item === undefined) return null;
+        const s = String(item).trim().replace(/\.0$/, '');
+        if (!/^\d+$/.test(s) || s.length > spec.digits) return null;
+        cleanArr.push(s.padStart(spec.digits, '0'));
+      }
+      normalized[spec.key] = cleanArr;
     }
-    h ^= h >>> 16;
-    h = Math.imul(h, 0x85ebca6b);
-    h ^= h >>> 13;
-    h = Math.imul(h, 0xc2b2ae35);
-    h ^= h >>> 16;
-    return h >>> 0;
+    return normalized;
   }
 
-  function createDeterministicGenerator(seedInt) {
-    let a = seedInt >>> 0;
-    return function nextFloat() {
-      a |= 0;
-      a = (a + 0x6d2b79f5) | 0;
-      let t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-
-  function pad2(n) {
-    const v = parseInt(n, 10) || 0;
-    return v < 10 ? '0' + v : '' + (v % 100);
-  }
-
-  function reverse2(str2) {
-    const s = String(str2).padStart(2, '0');
-    return s[1] + s[0];
-  }
-
-  function bongDuongDigit(d) {
-    return (d + 5) % 10;
-  }
-
-  const BONG_AM_MAP = { 0: 7, 7: 0, 1: 4, 4: 1, 2: 9, 9: 2, 3: 6, 6: 3, 5: 8, 8: 5 };
-  function bongAmDigit(d) {
-    return BONG_AM_MAP[d];
+  function getPrizeSignature(pt) {
+    if (!pt || !pt.G0 || !pt.G1 || !pt.G7) return '';
+    return `${pt.G0[0]}|${pt.G1[0]}|${pt.G7.join(',')}`;
   }
 
   /**
-   * Builds a rich Draw Record with full prizeTable, lotoByHead (Đầu 0-9), lotoByTail (Đuôi 0-9),
+   * Builds a rich Draw Record with full 27-prize table, lotoByHead (Đầu 0-9), lotoByTail (Đuôi 0-9),
    * and 32 digitPositions for bridge scanning.
    */
-  function enrichDrawRecord(dateCode, prizeTable, sourceLabel) {
-    const dObj = new Date(dateCode + 'T18:30:00');
-    const dayOfWeek = isNaN(dObj.getTime()) ? 0 : dObj.getDay();
+  function enrichDrawRecord(dateCode, rawPrizeTable, sourceLabel) {
+    const prizeTable = normalizeXsmbPrizeTable(rawPrizeTable);
+    if (!prizeTable) return null;
+
+    const dObj = new Date(dateCode + 'T12:00:00Z');
+    const dayOfWeek = isNaN(dObj.getTime()) ? 0 : dObj.getUTCDay();
 
     const orderedPrizes = [
-      ...(prizeTable.G0 || []),
-      ...(prizeTable.G1 || []),
-      ...(prizeTable.G2 || []),
-      ...(prizeTable.G3 || []),
-      ...(prizeTable.G4 || []),
-      ...(prizeTable.G5 || []),
-      ...(prizeTable.G6 || []),
-      ...(prizeTable.G7 || []),
-      ...(prizeTable.G8 || [])
-    ].map(x => String(x).trim()).filter(Boolean);
+      ...prizeTable.G0,
+      ...prizeTable.G1,
+      ...prizeTable.G2,
+      ...prizeTable.G3,
+      ...prizeTable.G4,
+      ...prizeTable.G5,
+      ...prizeTable.G6,
+      ...prizeTable.G7
+    ];
 
     const lotoNumbers = [];
     const digitPositions = [];
 
     for (const pStr of orderedPrizes) {
-      const clean = pStr.replace(/\D/g, '');
-      if (clean.length >= 2) {
-        const last2 = parseInt(clean.slice(-2), 10);
-        lotoNumbers.push(last2);
-      }
-      for (let i = 0; i < clean.length; i++) {
+      const last2 = parseInt(pStr.slice(-2), 10);
+      lotoNumbers.push(last2);
+      for (let i = 0; i < pStr.length; i++) {
         if (digitPositions.length < 36) {
-          digitPositions.push(parseInt(clean[i], 10));
+          digitPositions.push(parseInt(pStr[i], 10));
         }
       }
     }
 
-    while (digitPositions.length < 32) {
-      digitPositions.push((digitPositions.length * 3) % 10);
-    }
-
-    // Group Loto by Head (Đầu 0..9) and Tail (Đuôi 0..9)
     const lotoByHead = Array.from({ length: 10 }, () => []);
     const lotoByTail = Array.from({ length: 10 }, () => []);
     const hitCounts = new Array(100).fill(0);
@@ -267,17 +282,17 @@
       lotoByTail[i].sort();
     }
 
-    const sp = (prizeTable.G0 && prizeTable.G0[0]) ? String(prizeTable.G0[0]) : '00000';
-    const fp = (prizeTable.G1 && prizeTable.G1[0]) ? String(prizeTable.G1[0]) : '00000';
+    const sp = prizeTable.G0[0];
+    const fp = prizeTable.G1[0];
 
     return {
       date: dateCode,
       dayOfWeek,
-      source: sourceLabel || 'Internet API',
+      source: sourceLabel || 'Dữ liệu XSMB thật',
       specialPrize: sp,
       firstPrize: fp,
-      special2: parseInt(sp.slice(-2), 10) || 0,
-      first2: parseInt(fp.slice(-2), 10) || 0,
+      special2: parseInt(sp.slice(-2), 10),
+      first2: parseInt(fp.slice(-2), 10),
       prizeTable,
       prizes: orderedPrizes,
       lotoNumbers,
@@ -289,289 +304,370 @@
   }
 
   /**
-   * Parses a row from khiemdoan/vietnam-lottery-xsmb-analysis/data/xsmb.json
+   * Parses a real historical row from khiemdoan/vietnam-lottery-xsmb-analysis/data/xsmb.json
    */
   function parseGithubXsmbRow(row) {
-    const rawDate = String(row.date || '').slice(0, 10);
-    const padP = (val, len) => String(val !== undefined && val !== null ? val : '').replace(/\.0$/, '').padStart(len, '0');
+    if (!row || !row.date) return null;
+    const rawDate = String(row.date).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) return null;
 
-    const prizeTable = {
-      G0: [padP(row.special, 5)],
-      G1: [padP(row.prize1, 5)],
-      G2: [padP(row.prize2_1, 5), padP(row.prize2_2, 5)],
-      G3: [
-        padP(row.prize3_1, 5), padP(row.prize3_2, 5), padP(row.prize3_3, 5),
-        padP(row.prize3_4, 5), padP(row.prize3_5, 5), padP(row.prize3_6, 5)
-      ],
-      G4: [padP(row.prize4_1, 4), padP(row.prize4_2, 4), padP(row.prize4_3, 4), padP(row.prize4_4, 4)],
-      G5: [
-        padP(row.prize5_1, 4), padP(row.prize5_2, 4), padP(row.prize5_3, 4),
-        padP(row.prize5_4, 4), padP(row.prize5_5, 4), padP(row.prize5_6, 4)
-      ],
-      G6: [padP(row.prize6_1, 3), padP(row.prize6_2, 3), padP(row.prize6_3, 3)],
-      G7: [padP(row.prize7_1, 2), padP(row.prize7_2, 2), padP(row.prize7_3, 2), padP(row.prize7_4, 2)]
+    const rawPt = {
+      G0: [row.special],
+      G1: [row.prize1],
+      G2: [row.prize2_1, row.prize2_2],
+      G3: [row.prize3_1, row.prize3_2, row.prize3_3, row.prize3_4, row.prize3_5, row.prize3_6],
+      G4: [row.prize4_1, row.prize4_2, row.prize4_3, row.prize4_4],
+      G5: [row.prize5_1, row.prize5_2, row.prize5_3, row.prize5_4, row.prize5_5, row.prize5_6],
+      G6: [row.prize6_1, row.prize6_2, row.prize6_3],
+      G7: [row.prize7_1, row.prize7_2, row.prize7_3, row.prize7_4]
     };
 
-    return enrichDrawRecord(rawDate, prizeTable, 'Trực tiếp Internet (GitHub XSMB Live)');
+    return enrichDrawRecord(rawDate, rawPt, 'Dữ liệu thật (GitHub XSMB)');
   }
 
   /**
-   * Parses RSS XML from xskt.com.vn for XSMB / XSMN / XSMT
+   * Parses real XSMB RSS XML from xskt.com.vn
    */
-  function parseXsktRssXml(xmlText, region) {
+  function parseXsktRssXml(xmlText, clockInfo) {
+    if (!xmlText || typeof xmlText !== 'string') return [];
+    const clock = clockInfo || getVietnamClockInfo();
     const draws = [];
     const itemRegex = /<item>([\s\S]*?)<\/item>/g;
     let match;
+
     while ((match = itemRegex.exec(xmlText)) !== null) {
       const itemXml = match[1];
-      const titleMatch = itemXml.match(/<title>([\s\S]*?)<\/title>/);
-      const descMatch = itemXml.match(/<description>([\s\S]*?)<\/description>/);
+      const linkMatch = itemXml.match(/<link>([\s\S]*?)<\/link>/i);
+      const titleMatch = itemXml.match(/<title>([\s\S]*?)<\/title>/i);
+      const descMatch = itemXml.match(/<description>([\s\S]*?)<\/description>/i);
       if (!descMatch) continue;
 
       let dateCode = '';
-      if (titleMatch) {
-        const dm = titleMatch[1].match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
-        if (dm) {
-          const dd = dm[1].padStart(2, '0');
-          const mm = dm[2].padStart(2, '0');
-          const yyyy = dm[3] || new Date().getFullYear();
+      if (linkMatch) {
+        const lm = linkMatch[1].match(/ngay-(\d{1,2})-(\d{1,2})-(\d{4})/i);
+        if (lm) {
+          dateCode = `${lm[3]}-${lm[2].padStart(2, '0')}-${lm[1].padStart(2, '0')}`;
+        }
+      }
+      if (!dateCode && titleMatch) {
+        const tm = titleMatch[1].match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
+        if (tm) {
+          const dd = tm[1].padStart(2, '0');
+          const mm = tm[2].padStart(2, '0');
+          let yyyy = tm[3] ? parseInt(tm[3], 10) : clock.year;
+          if (!tm[3] && clock.todayStr.slice(5, 7) === '01' && mm === '12') {
+            yyyy -= 1;
+          }
           dateCode = `${yyyy}-${mm}-${dd}`;
         }
       }
-      if (!dateCode) dateCode = new Date().toISOString().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateCode)) continue;
 
-      const desc = descMatch[1].replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]+>/g, ' ');
-      const grab = (labelRegex) => {
+      const desc = descMatch[1]
+        .replace(/<!\[CDATA\[|\]\]>/g, '')
+        .replace(/<[^>]+>/g, '\n');
+
+      const grabLine = (labelRegex) => {
         const m = desc.match(labelRegex);
         if (!m) return [];
         return m[1].trim().split(/[\s,-]+/).map(s => s.replace(/\D/g, '')).filter(Boolean);
       };
 
-      const g0 = grab(/(?:ĐB|Đặc biệt)\s*:\s*([0-9\s-]+)/i);
-      const g1 = grab(/1\s*:\s*([0-9\s-]+)/i);
-      const g2 = grab(/2\s*:\s*([0-9\s-]+)/i);
-      const g3 = grab(/3\s*:\s*([0-9\s-]+)/i);
-      const g4 = grab(/4\s*:\s*([0-9\s-]+)/i);
-      const g5 = grab(/5\s*:\s*([0-9\s-]+)/i);
-      const g6 = grab(/6\s*:\s*([0-9\s-]+)/i);
-      const g7 = grab(/7\s*:\s*([0-9\s-]+)/i);
-      const g8 = grab(/8\s*:\s*([0-9\s-]+)/i);
+      const rawPt = {
+        G0: grabLine(/(?:^|\n)\s*(?:ĐB|Đặc biệt)\s*:\s*([^\n\r]+)/i),
+        G1: grabLine(/(?:^|\n)\s*1\s*:\s*([^\n\r]+)/i),
+        G2: grabLine(/(?:^|\n)\s*2\s*:\s*([^\n\r]+)/i),
+        G3: grabLine(/(?:^|\n)\s*3\s*:\s*([^\n\r]+)/i),
+        G4: grabLine(/(?:^|\n)\s*4\s*:\s*([^\n\r]+)/i),
+        G5: grabLine(/(?:^|\n)\s*5\s*:\s*([^\n\r]+)/i),
+        G6: grabLine(/(?:^|\n)\s*6\s*:\s*([^\n\r]+)/i),
+        G7: grabLine(/(?:^|\n)\s*7\s*:\s*([^\n\r]+)/i)
+      };
 
-      if (g0.length > 0 && g1.length > 0) {
-        draws.push(enrichDrawRecord(dateCode, {
-          G0: g0, G1: g1, G2: g2, G3: g3, G4: g4, G5: g5, G6: g6, G7: g7, G8: g8
-        }, `Trực tiếp Internet (RSS ${region.toUpperCase()})`));
-      }
+      const enriched = enrichDrawRecord(dateCode, rawPt, 'Dữ liệu thật (XSKT.com.vn)');
+      if (enriched) draws.push(enriched);
     }
+
     return draws;
   }
 
-  /**
-   * Ensures the fetched draws array aligns strictly with the 18:35 Vietnam time cutoff:
-   * - Before 18:35 -> latest draw is yesterday (filters out any premature today entry).
-   * - At/After 18:35 -> latest draw MUST be today (merges today's 18:35 draw on top if upstream archive is still at yesterday).
-   */
-  function alignDrawsWith1835Cutoff(draws, region, clockInfo) {
-    const clock = clockInfo || getVietnamClockInfo();
-    const expectedDate = clock.expectedLatestDrawDate;
+  function parseWeekdayFromApiTime(timeVal) {
+    const t = String(timeVal || '').trim();
+    if (!t) return { dateCode: null, dow: null };
 
-    // Filter out any draw newer than expectedDate (e.g., if before 18:35)
-    let aligned = draws.filter(d => d.date <= expectedDate);
-
-    if (aligned.length === 0 || aligned[0].date < expectedDate) {
-      // Upstream archive hasn't pushed today's 18:35 draw yet -> generate/merge missing draw(s) up to expectedDate
-      const fallbackUpToExpected = buildHistoricalDraws(region, expectedDate);
-      const existingDates = new Set(aligned.map(d => d.date));
-      const missingNewest = [];
-      for (const fb of fallbackUpToExpected) {
-        if (fb.date <= expectedDate && !existingDates.has(fb.date)) {
-          if (aligned.length === 0 || fb.date > aligned[0].date) {
-            fb.source = clock.isAfter1835
-              ? `Cập nhật tự động 18h35 (${fb.date})`
-              : `Dữ liệu kỳ gần nhất (${fb.date})`;
-            missingNewest.push(fb);
-          }
-        }
-      }
-      aligned = [...missingNewest, ...aligned].slice(0, 100);
+    // Full date dd/mm/yyyy or dd-mm-yyyy
+    const dm = t.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+    if (dm) {
+      return {
+        dateCode: `${dm[3]}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}`,
+        dow: null
+      };
     }
 
-    return {
-      draws: aligned,
-      clock
-    };
+    const lower = t.toLowerCase();
+    if (lower === '2' || lower.includes('hai')) return { dateCode: null, dow: 1 };
+    if (lower === '3' || lower.includes('ba')) return { dateCode: null, dow: 2 };
+    if (lower === '4' || lower.includes('tư') || lower.includes('tu')) return { dateCode: null, dow: 3 };
+    if (lower === '5' || lower.includes('năm') || lower.includes('nam')) return { dateCode: null, dow: 4 };
+    if (lower === '6' || lower.includes('sáu') || lower.includes('sau')) return { dateCode: null, dow: 5 };
+    if (lower === '7' || lower.includes('bảy') || lower.includes('bay')) return { dateCode: null, dow: 6 };
+    if (lower.includes('nhật') || lower.includes('nhat') || lower === 'cn' || lower === '8') return { dateCode: null, dow: 0 };
+
+    return { dateCode: null, dow: null };
   }
 
   /**
-   * Fetches real historical lottery draws directly from the Internet and enforces the 18:35 cutoff rule.
+   * Parses live today's XSMB result from api-xsmb-today.onrender.com/api/v1.
+   * Only accepts complete 27-prize draws whose date can be strictly verified (never guesses).
    */
-  async function fetchLiveDrawsFromInternet(region = 'xsmb') {
+  function parseXsmbTodayJson(json, existingDraws, clockInfo) {
+    if (!json || !json.results || Number(json.countNumbers) !== 27) return null;
+    const res = json.results;
+    const rawPt = {
+      G0: res['ĐB'] || res.DB || res.G0,
+      G1: res.G1,
+      G2: res.G2,
+      G3: res.G3,
+      G4: res.G4,
+      G5: res.G5,
+      G6: res.G6,
+      G7: res.G7
+    };
+    const pt = normalizeXsmbPrizeTable(rawPt);
+    if (!pt) return null;
+
+    // If this exact 27-prize draw is already in existingDraws (e.g. from xsmb.json or xskt), skip
+    const sig = getPrizeSignature(pt);
+    if (Array.isArray(existingDraws)) {
+      for (const ex of existingDraws) {
+        if (getPrizeSignature(ex.prizeTable) === sig) {
+          return null;
+        }
+      }
+    }
+
+    const clock = clockInfo || getVietnamClockInfo();
+    const parsedTime = parseWeekdayFromApiTime(json.time);
+    let dateCode = parsedTime.dateCode;
+
+    if (!dateCode && parsedTime.dow !== null) {
+      if (parsedTime.dow === clock.todayDow && clock.isAfter1835) {
+        dateCode = clock.todayStr;
+      } else if (parsedTime.dow === clock.yesterdayDow) {
+        dateCode = clock.yesterdayStr;
+      }
+    }
+
+    if (!dateCode || !/^\d{4}-\d{2}-\d{2}$/.test(dateCode)) return null;
+    return enrichDrawRecord(dateCode, pt, 'Dữ liệu thật (API Live 18h35)');
+  }
+
+  /**
+   * Aligns real draws strictly with the 18:35 Vietnam time cutoff.
+   * NEVER fabricates or inserts fake draws if today's result is not available yet!
+   */
+  function alignDrawsWith1835Cutoff(draws, clockInfo) {
+    const clock = clockInfo || getVietnamClockInfo();
+    const expectedDate = clock.expectedLatestDrawDate;
+
+    const aligned = (Array.isArray(draws) ? draws : [])
+      .filter(d => d && d.date && d.date <= expectedDate)
+      .sort((a, b) => (b.date > a.date ? 1 : (b.date < a.date ? -1 : 0)))
+      .slice(0, 100);
+
+    const latestDate = aligned.length > 0 ? aligned[0].date : null;
+    const hasTodayResult = latestDate === clock.todayStr;
+    const waitingForTodayDraw = clock.isAfter1835 && !hasTodayResult;
+
+    return {
+      draws: aligned,
+      clock,
+      hasTodayResult,
+      waitingForTodayDraw
+    };
+  }
+
+  function isCapacitorNative() {
+    try {
+      return !!(global.Capacitor && typeof global.Capacitor.isNativePlatform === 'function' && global.Capacitor.isNativePlatform());
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function isLocalhostBrowser() {
+    try {
+      if (isCapacitorNative() || !global.location) return false;
+      const h = global.location.hostname;
+      return (global.location.protocol === 'http:' || global.location.protocol === 'https:') &&
+        (h === 'localhost' || h === '127.0.0.1');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function fetchWithTimeout(url, options, timeoutMs) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs || 12000) : null;
+    try {
+      const res = await fetch(url, {
+        ...(options || {}),
+        cache: 'no-store',
+        signal: controller ? controller.signal : undefined
+      });
+      return res;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  async function fetchXsktRssText() {
+    // 1. Native Capacitor Android/iOS HTTP (no CORS)
+    if (isCapacitorNative() && global.Capacitor && global.Capacitor.Plugins && global.Capacitor.Plugins.CapacitorHttp) {
+      const resp = await global.Capacitor.Plugins.CapacitorHttp.get({ url: LIVE_ENDPOINTS.xsmb_rss });
+      if (resp && resp.status >= 200 && resp.status < 300 && typeof resp.data === 'string') {
+        return resp.data;
+      }
+      throw new Error('CapacitorHttp XSKT failed');
+    }
+    // 2. Local development server proxy (/api/xsmb-rss)
+    if (isLocalhostBrowser()) {
+      const res = await fetchWithTimeout(LIVE_ENDPOINTS.local_rss_proxy, {}, 10000);
+      if (!res.ok) throw new Error('Local RSS proxy error ' + res.status);
+      return await res.text();
+    }
+    // 3. Node.js environment (for tests)
+    if (typeof window === 'undefined' && typeof fetch === 'function') {
+      const res = await fetchWithTimeout(LIVE_ENDPOINTS.xsmb_rss, {}, 10000);
+      if (!res.ok) throw new Error('Direct RSS error ' + res.status);
+      return await res.text();
+    }
+    return null;
+  }
+
+  function purgeLegacyFakeCaches() {
+    try {
+      if (!global.localStorage) return;
+      for (const k of LEGACY_CACHE_KEYS) {
+        global.localStorage.removeItem(k);
+      }
+    } catch (_) {}
+  }
+
+  function loadCachedRealDraws(clockInfo) {
+    purgeLegacyFakeCaches();
+    try {
+      if (!global.localStorage) return null;
+      const raw = global.localStorage.getItem(REAL_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return null;
+
+      const validDraws = [];
+      for (const item of parsed) {
+        if (item && item.date && item.prizeTable) {
+          const rebuilt = enrichDrawRecord(item.date, item.prizeTable, item.source || 'Bộ nhớ đệm dữ liệu thật');
+          if (rebuilt) validDraws.push(rebuilt);
+        }
+      }
+      if (validDraws.length === 0) return null;
+
+      const alignedInfo = alignDrawsWith1835Cutoff(validDraws, clockInfo);
+      if (alignedInfo.draws.length === 0) return null;
+
+      return {
+        isLive: false,
+        fromCache: true,
+        ...alignedInfo,
+        source: `Bộ nhớ đệm thật • Kỳ ${alignedInfo.draws[0].date}`
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /**
+   * Fetches 100% REAL XSMB draws from Internet sources:
+   * - GitHub Archive (khiemdoan/vietnam-lottery-xsmb-analysis/data/xsmb.json) for 100 real draws
+   * - XSKT.com.vn RSS (via local proxy on localhost, CapacitorHttp on native mobile, direct in Node)
+   * - API XSMB Today (api-xsmb-today.onrender.com/api/v1) for CORS-enabled live today result
+   */
+  async function fetchLiveDrawsFromInternet() {
     const clock = getVietnamClockInfo();
+    purgeLegacyFakeCaches();
     if (typeof fetch === 'undefined') {
       throw new Error('Môi trường hiện tại không hỗ trợ fetch');
     }
 
-    let rawDraws = [];
-    let sourceLabel = '';
-
-    if (region === 'xsmb') {
-      try {
-        const res = await fetch(LIVE_ENDPOINTS.xsmb_json, { cache: 'no-store' });
-        if (res.ok) {
-          const text = await res.text();
-          let rows = [];
-          try {
-            const parsed = JSON.parse(text);
-            rows = Array.isArray(parsed) ? parsed : (parsed.data || []);
-          } catch (_) {
-            rows = text.trim().split('\n').slice(-110).map(line => JSON.parse(line));
-          }
-          if (rows.length > 0) {
-            const last100 = rows.slice(-100).reverse();
-            rawDraws = last100.map(parseGithubXsmbRow);
-            sourceLabel = 'Trực tiếp Internet (Cập nhật 18h35)';
-          }
+    const [githubResult, rssResult, todayResult] = await Promise.allSettled([
+      fetchWithTimeout(LIVE_ENDPOINTS.xsmb_json, {}, 15000).then(async res => {
+        if (!res.ok) throw new Error('GitHub XSMB HTTP ' + res.status);
+        const text = await res.text();
+        let rows;
+        try {
+          const parsed = JSON.parse(text);
+          rows = Array.isArray(parsed) ? parsed : (parsed.data || []);
+        } catch (_) {
+          rows = text.trim().split('\n').slice(-120).map(line => JSON.parse(line));
         }
-      } catch (err) {
-        // Continue to RSS fallback
+        return rows.slice(-110).map(parseGithubXsmbRow).filter(Boolean);
+      }),
+      fetchXsktRssText().then(xml => (xml ? parseXsktRssXml(xml, clock) : [])),
+      fetchWithTimeout(LIVE_ENDPOINTS.xsmb_today, {}, 12000).then(async res => {
+        if (!res.ok) throw new Error('API Today HTTP ' + res.status);
+        return await res.json();
+      })
+    ]);
+
+    const byDate = new Map();
+
+    // 1. Add GitHub historical real draws (oldest -> newest so newer/more specific overwrite)
+    if (githubResult.status === 'fulfilled' && Array.isArray(githubResult.value)) {
+      for (const d of githubResult.value) {
+        if (d.date <= clock.expectedLatestDrawDate) {
+          byDate.set(d.date, d);
+        }
       }
     }
 
-    // If rawDraws is empty OR if past 18:35 and rawDraws doesn't have today's draw yet, also check live RSS
-    if (rawDraws.length === 0 || (clock.isAfter1835 && rawDraws[0].date < clock.expectedLatestDrawDate)) {
-      try {
-        const rssUrl = region === 'xsmb'
-          ? LIVE_ENDPOINTS.xsmb_rss
-          : (region === 'xsmn' ? LIVE_ENDPOINTS.xsmn_rss : LIVE_ENDPOINTS.xsmt_rss);
-        const rssRes = await fetch(rssUrl, { cache: 'no-store' });
-        if (rssRes.ok) {
-          const xmlText = await rssRes.text();
-          const rssDraws = parseXsktRssXml(xmlText, region);
-          if (rssDraws.length > 0) {
-            const existingDates = new Set(rawDraws.map(d => d.date));
-            const newFromRss = rssDraws.filter(d => !existingDates.has(d.date));
-            rawDraws = [...newFromRss, ...rawDraws];
-            rawDraws.sort((a, b) => (b.date > a.date ? 1 : -1));
-            sourceLabel = `XSKT Trực tiếp 18h35 (${region.toUpperCase()})`;
-          }
+    // 2. Merge XSKT RSS real draws (has exact full date & latest draw right after 18:30)
+    if (rssResult.status === 'fulfilled' && Array.isArray(rssResult.value)) {
+      for (const d of rssResult.value) {
+        if (d.date <= clock.expectedLatestDrawDate) {
+          byDate.set(d.date, d);
         }
-      } catch (_) {}
+      }
     }
 
-    if (rawDraws.length === 0) {
-      throw new Error('Không thể kết nối máy chủ KQXS');
+    // 3. Merge live CORS API-Today draw if complete and not already present
+    const existingList = Array.from(byDate.values());
+    if (todayResult.status === 'fulfilled' && todayResult.value) {
+      const todayDraw = parseXsmbTodayJson(todayResult.value, existingList, clock);
+      if (todayDraw && todayDraw.date <= clock.expectedLatestDrawDate && !byDate.has(todayDraw.date)) {
+        byDate.set(todayDraw.date, todayDraw);
+      }
     }
 
-    // Align strictly with the 18:35 rule so after 18:35 today's draw is ALWAYS at index 0
-    const { draws: finalDraws } = alignDrawsWith1835Cutoff(rawDraws, region, clock);
+    const merged = Array.from(byDate.values());
+    const alignedInfo = alignDrawsWith1835Cutoff(merged, clock);
+
+    if (alignedInfo.draws.length === 0) {
+      throw new Error('Không tải được dữ liệu KQXS Miền Bắc thật từ Internet.');
+    }
 
     try {
-      localStorage.setItem('LOTO_AI_LIVE_CACHE_' + region, JSON.stringify(finalDraws));
+      if (global.localStorage) {
+        global.localStorage.setItem(REAL_CACHE_KEY, JSON.stringify(alignedInfo.draws));
+      }
     } catch (_) {}
 
+    const latestDraw = alignedInfo.draws[0];
     return {
       isLive: true,
-      clock,
-      source: `${sourceLabel || 'Trực tiếp Internet'} • Kỳ ${finalDraws[0].date}`,
-      draws: finalDraws
+      fromCache: false,
+      ...alignedInfo,
+      source: `${latestDraw.source} • Kỳ ${latestDraw.date}`
     };
-  }
-
-  /**
-   * Builds a 100% deterministic 100-draw dataset with full 27-prize table (Giải ĐB -> Giải 7/8).
-   */
-  function buildHistoricalDraws(region, targetDateStr, customLatestOverride) {
-    const baseDate = new Date((targetDateStr || '2026-11-23') + 'T18:30:00');
-    const draws = [];
-
-    const regionSeed = hashString('REGION_LATENT:' + region);
-    const regionRng = createDeterministicGenerator(regionSeed);
-    const latentBias = new Array(100);
-    for (let n = 0; n < 100; n++) {
-      latentBias[n] = 0.85 + regionRng() * 0.3;
-    }
-
-    const chronological = [];
-    for (let back = 99; back >= 0; back--) {
-      const d = new Date(baseDate.getTime() - back * 86400000);
-      const y = d.getFullYear();
-      const m = pad2(d.getMonth() + 1);
-      const day = pad2(d.getDate());
-      const dateCode = `${y}-${m}-${day}`;
-      const dayOfWeek = d.getDay();
-
-      const drawSeed = hashString(`${region}:${dateCode}:DRAW_V2`);
-      const rng = createDeterministicGenerator(drawSeed);
-      const prevDraw = chronological.length > 0 ? chronological[chronological.length - 1] : null;
-
-      const genPrize = (digits, pIndex) => {
-        let last2;
-        if (prevDraw && pIndex < 4 && rng() < 0.35) {
-          const dA = prevDraw.digitPositions[(pIndex * 3 + 1) % prevDraw.digitPositions.length];
-          const dB = prevDraw.digitPositions[(pIndex * 5 + 2) % prevDraw.digitPositions.length];
-          last2 = dA * 10 + dB;
-        } else {
-          const rawPick = Math.floor(rng() * 100);
-          const dowShift = (rawPick + dayOfWeek * 7) % 100;
-          last2 = latentBias[rawPick] >= latentBias[dowShift] ? rawPick : dowShift;
-        }
-        let prefix = '';
-        for (let k = 0; k < digits - 2; k++) {
-          prefix += Math.floor(rng() * 10);
-        }
-        return prefix + pad2(last2);
-      };
-
-      let prizeTable;
-      if (region === 'xsmb') {
-        prizeTable = {
-          G0: [genPrize(5, 0)],
-          G1: [genPrize(5, 1)],
-          G2: [genPrize(5, 2), genPrize(5, 3)],
-          G3: [genPrize(5, 4), genPrize(5, 5), genPrize(5, 6), genPrize(5, 7), genPrize(5, 8), genPrize(5, 9)],
-          G4: [genPrize(4, 10), genPrize(4, 11), genPrize(4, 12), genPrize(4, 13)],
-          G5: [genPrize(4, 14), genPrize(4, 15), genPrize(4, 16), genPrize(4, 17), genPrize(4, 18), genPrize(4, 19)],
-          G6: [genPrize(3, 20), genPrize(3, 21), genPrize(3, 22)],
-          G7: [genPrize(2, 23), genPrize(2, 24), genPrize(2, 25), genPrize(2, 26)]
-        };
-      } else {
-        prizeTable = {
-          G0: [genPrize(6, 0)],
-          G1: [genPrize(5, 1)],
-          G2: [genPrize(5, 2)],
-          G3: [genPrize(5, 3), genPrize(5, 4)],
-          G4: [genPrize(5, 5), genPrize(5, 6), genPrize(5, 7), genPrize(5, 8), genPrize(5, 9), genPrize(5, 10), genPrize(5, 11)],
-          G5: [genPrize(4, 12)],
-          G6: [genPrize(4, 13), genPrize(4, 14), genPrize(4, 15)],
-          G7: [genPrize(3, 16)],
-          G8: [genPrize(2, 17)]
-        };
-      }
-
-      chronological.push(enrichDrawRecord(dateCode, prizeTable, 'Dữ liệu chuẩn hóa theo ngày'));
-    }
-
-    for (let i = chronological.length - 1; i >= 0; i--) {
-      draws.push(chronological[i]);
-    }
-
-    if (customLatestOverride && customLatestOverride.specialPrize) {
-      const sp = String(customLatestOverride.specialPrize).replace(/\D/g, '').padStart(5, '0').slice(-5);
-      const fp = String(customLatestOverride.firstPrize || draws[0].firstPrize).replace(/\D/g, '').padStart(5, '0').slice(-5);
-      const pt = JSON.parse(JSON.stringify(draws[0].prizeTable));
-      pt.G0 = [sp];
-      pt.G1 = [fp];
-      if (Array.isArray(customLatestOverride.extraLotos) && customLatestOverride.extraLotos.length > 0) {
-        customLatestOverride.extraLotos.forEach((val, idx) => {
-          if (pt.G7 && idx < pt.G7.length) {
-            pt.G7[idx] = pad2(val);
-          }
-        });
-      }
-      draws[0] = enrichDrawRecord(draws[0].date, pt, 'KQXS người dùng nhập trực tiếp');
-    }
-
-    return draws;
   }
 
   function normalizeScores(rawArray, minOut = 50, maxOut = 98) {
@@ -591,6 +687,7 @@
   }
 
   function evaluateAllNumbers(draws) {
+    if (!Array.isArray(draws) || draws.length === 0) return null;
     const N = draws.length;
     const latest = draws[0];
     const targetDow = (latest.dayOfWeek + 1) % 7;
@@ -947,6 +1044,7 @@
   }
 
   function computePredictions(evaluatedData, weightsMap, options = {}) {
+    if (!evaluatedData) return null;
     const danSize = Math.max(2, Math.min(65, parseInt(options.danSize, 10) || 10));
 
     const ranked = evaluatedData.items.map(item => {
@@ -1098,7 +1196,10 @@
     const results = [];
     let bachThuHits = 0, songThuHits = 0, danHits = 0, deHitsInDan = 0;
 
-    for (let d = 1; d <= Math.min(daysToTest, draws.length - 35); d++) {
+    const minHistory = draws.length > 40 ? 35 : Math.max(1, Math.floor(draws.length / 2));
+    const maxDays = Math.min(daysToTest, draws.length - minHistory);
+
+    for (let d = 1; d <= maxDays; d++) {
       const historicalSlice = draws.slice(d);
       const actualNextDraw = draws[d - 1];
       const actualSet = new Set(actualNextDraw.lotoNumbers);
@@ -1138,17 +1239,25 @@
     const total = results.length || 1;
     return {
       daysTested: results.length,
-      bachThuRate: Math.round((bachThuHits / total) * 100),
-      songThuRate: Math.round((songThuHits / total) * 100),
-      danWinRate: Math.round((danHits / total) * 100),
-      deRate: Math.round((deHitsInDan / total) * 100),
+      bachThuRate: results.length ? Math.round((bachThuHits / total) * 100) : 0,
+      songThuRate: results.length ? Math.round((songThuHits / total) * 100) : 0,
+      danWinRate: results.length ? Math.round((danHits / total) * 100) : 0,
+      deRate: results.length ? Math.round((deHitsInDan / total) * 100) : 0,
       history: results
     };
   }
 
-  function getConfigSignature(region, dateStr, weightsMap) {
+  function getConfigSignature(dateOrRegion, maybeDateOrWeights, maybeWeights) {
+    let dateStr, weightsMap;
+    if (maybeWeights !== undefined) {
+      dateStr = maybeDateOrWeights;
+      weightsMap = maybeWeights;
+    } else {
+      dateStr = dateOrRegion;
+      weightsMap = maybeDateOrWeights || {};
+    }
     const wArr = ALGORITHMS.map(a => weightsMap[a.id] || 0);
-    return `${region.toUpperCase()}-${String(dateStr).replace(/-/g, '')}-[${wArr.join('.')}]`;
+    return `XSMB-${String(dateStr).replace(/-/g, '')}-[${wArr.join('.')}]`;
   }
 
   // 6 Bộ Thuật Toán Tổng (Each sums strictly to 100%)
@@ -1198,9 +1307,10 @@
   ];
 
   /**
-   * Evaluates all 6 Preset Strategies on recent historical draws to find which one is hitting the most!
+   * Evaluates all 6 Preset Strategies on recent real historical draws to find which one matched the most.
    */
   function rankPresetStrategies(draws, daysToTest = 8, danSize = 10) {
+    if (!Array.isArray(draws) || draws.length === 0) return null;
     const evaluatedLatest = evaluateAllNumbers(draws);
     const list = PRESET_STRATEGIES.map(preset => {
       const bt = runHistoricalBacktest(draws, preset.weights, daysToTest, danSize);
@@ -1245,9 +1355,10 @@
 
   /**
    * Evaluates user's favorite numbers ("Số Bạn Kết") under the selected algorithm weights
-   * and compares their % across all 6 preset strategies.
+   * and compares their statistical scores across all 6 preset strategies.
    */
   function evaluateFavoriteNumbers(evaluatedData, weightsMap, rawInput) {
+    if (!evaluatedData) return { numbers: [], groupAvgPct: '0.00' };
     const tokens = String(rawInput || '')
       .split(/[\s,;.-]+/)
       .map(s => s.replace(/\D/g, ''))
@@ -1267,7 +1378,6 @@
       const revStr = reverse2(numStr);
       const revItem = currentPred.byNumMap[revStr];
 
-      // Compare across all 6 preset strategies
       const acrossPresets = PRESET_STRATEGIES.map(p => {
         const pItem = presetPredictions[p.id].byNumMap[numStr];
         return {
@@ -1282,20 +1392,19 @@
 
       acrossPresets.sort((a, b) => b.score - a.score);
 
-      //Combined pair score if played as Song Thủ with its reverse
       const p1 = item.finalScore / 100;
       const p2 = revItem.finalScore / 100;
       const pairHitPct = numStr === revStr
         ? item.finalScoreStr
         : Math.min(99.2, (1 - (1 - p1 * 0.45) * (1 - p2 * 0.45)) * 118).toFixed(2);
 
-      let verdict = '🔥 RẤT ĐẸP - ĐÁNG CHỐT';
+      let verdict = '🔥 ĐIỂM HỘI TỤ CAO';
       let verdictColor = 'emerald';
       if (item.rank > 15 && item.rank <= 40) {
-        verdict = '✅ KHÁ ỔN - NÊN LÓT ĐẢO';
+        verdict = '✅ KHÁ ỔN - CÂN NHẮC LÓT ĐẢO';
         verdictColor = 'blue';
       } else if (item.rank > 40) {
-        verdict = '⚠️ XÁC SUẤT THẤP / CẦN CÂN NHẮC';
+        verdict = '⚠️ ĐIỂM THẤP / CẦN CÂN NHẮC';
         verdictColor = 'amber';
       }
 
@@ -1312,7 +1421,6 @@
       };
     });
 
-    // If multiple numbers entered, compute combined Dàn / Xiên probability
     let groupAvgPct = '0.00';
     if (results.length > 0) {
       const sum = results.reduce((acc, r) => acc + r.item.finalScore, 0);
@@ -1329,13 +1437,18 @@
     ALGORITHMS,
     PRESET_STRATEGIES,
     LIVE_ENDPOINTS,
+    REAL_CACHE_KEY,
     pad2,
     reverse2,
     getVietnamClockInfo,
+    normalizeXsmbPrizeTable,
+    parseGithubXsmbRow,
+    parseXsktRssXml,
+    parseXsmbTodayJson,
     alignDrawsWith1835Cutoff,
     enrichDrawRecord,
+    loadCachedRealDraws,
     fetchLiveDrawsFromInternet,
-    buildHistoricalDraws,
     evaluateAllNumbers,
     computePredictions,
     runHistoricalBacktest,

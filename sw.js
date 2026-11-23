@@ -1,5 +1,5 @@
 const CACHE_NAME = 'loto-ai-pro-v1';
-const ASSETS = ['./index.html', './js/engine.js', './manifest.json'];
+const ASSETS = ['./index.html', './engine.js', './monetization.js', './manifest.json'];
 
 self.addEventListener('install', event => {
   event.waitUntil(

@@ -6,11 +6,12 @@
   <meta name="theme-color" content="#0f172a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>LotoAI Pro — Xem KQXS Trực Tiếp & Soi Cầu 10 Thuật Toán Tất Định</title>
+  <title>LotoAI Pro — Xem KQXS Miền Bắc Trực Tiếp & Thống Kê 10 Thuật Toán</title>
   <link rel="manifest" href="./manifest.json" />
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <script src="./engine.js"></script>
   <script>if (!window.LotoAIEngine) document.write('<script src="./js/engine.js"><\/script>');</script>
+  <script src="./monetization.js"></script>
   <style>
     body {
       background-color: #070b14;
@@ -53,22 +54,20 @@
           <div class="flex items-center gap-2">
             <h1 class="font-extrabold text-base sm:text-lg tracking-tight">LotoAI Pro</h1>
             <span id="live-status-pill" class="px-2.5 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono">
-              🌐 Đang tải KQXS 18h35...
+              🌐 Đang tải KQXS Miền Bắc thật...
             </span>
           </div>
-          <p class="text-xs text-slate-400">Tự động cập nhật KQXS đúng 18h35 • 6 Bộ Thuật Toán Tổng & 10 Thuật Toán Chi Tiết</p>
+          <p class="text-xs text-slate-400">100% Dữ liệu XSMB thật từ Internet • Tự động cập nhật lúc 18h35</p>
         </div>
       </div>
 
-      <!-- Region, Live Sync & SỐ BẠN KẾT Button -->
+      <!-- XSMB Badge, Live Sync & SỐ BẠN KẾT Button -->
       <div class="flex flex-wrap items-center gap-2 text-xs">
-        <div class="inline-flex rounded-xl bg-slate-800 p-1 border border-slate-700">
-          <button onclick="changeRegion('xsmb')" id="reg-xsmb" class="px-3 py-1.5 rounded-lg font-bold bg-blue-600 text-white transition">Miền Bắc</button>
-          <button onclick="changeRegion('xsmn')" id="reg-xsmn" class="px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition">Miền Nam</button>
-          <button onclick="changeRegion('xsmt')" id="reg-xsmt" class="px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition">Miền Trung</button>
+        <div class="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-3 py-1.5 border border-slate-700 font-bold text-blue-400">
+          <span>📍 Xổ Số Miền Bắc (XSMB)</span>
         </div>
         <button onclick="syncFromInternet()" id="btn-sync-net" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 font-semibold transition flex items-center gap-1">
-          <span>🔄 Tải KQXS 18h35</span>
+          <span>🔄 Tải KQXS Thật</span>
         </button>
         <!-- Replaced "Nhập Tay" with prominent "❤️ Số Bạn Kết" button -->
         <button onclick="openFavoriteMode()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold shadow-lg shadow-rose-600/35 transition transform hover:-translate-y-0.5 flex items-center gap-1.5 text-xs sm:text-sm">
@@ -77,6 +76,9 @@
       </div>
     </div>
   </header>
+
+  <!-- Thanh trạng thái dùng thử / VIP -->
+  <div id="monetization-bar" class="max-w-7xl w-full mx-auto px-3 sm:px-4 pt-3"></div>
 
   <!-- Main Content Grid -->
   <main class="max-w-7xl w-full mx-auto flex-1 p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -240,9 +242,8 @@
       pad2,
       reverse2,
       getVietnamClockInfo,
-      alignDrawsWith1835Cutoff,
+      loadCachedRealDraws,
       fetchLiveDrawsFromInternet,
-      buildHistoricalDraws,
       evaluateAllNumbers,
       computePredictions,
       runHistoricalBacktest,
@@ -254,7 +255,6 @@
     const initClock = getVietnamClockInfo();
 
     let state = {
-      region: 'xsmb',
       dateStr: initClock.expectedLatestDrawDate,
       predictForDate: initClock.predictionTargetDate,
       wasAfter1835: initClock.isAfter1835,
@@ -265,12 +265,14 @@
       danSize: 10,
       selectedNum: null,
       isLiveInternet: false,
-      sourceName: 'Đang kết nối Internet...',
+      hasTodayResult: false,
+      waitingForTodayDraw: false,
+      loadError: null,
+      sourceName: 'Đang tải dữ liệu thật từ Internet...',
       weights: {},
       locked: {}
     };
 
-    // By default, selecting a preset locks the 10 individual sliders below
     ALGORITHMS.forEach(a => {
       state.weights[a.id] = a.defaultWeight;
       state.locked[a.id] = true;
@@ -280,6 +282,8 @@
     let cachedEvaluation = null;
     let cachedPredictions = null;
     let cachedPresetRanking = null;
+    let waitingPollTimer = null;
+    let waitingPollAttempts = 0;
 
     function updateClockBanner() {
       const ck = getVietnamClockInfo();
@@ -290,11 +294,21 @@
 
       if (clockBadge) clockBadge.textContent = `🕒 ${ck.timeStr} (GMT+7)`;
       if (statusEl) {
-        if (ck.isAfter1835) {
-          statusEl.textContent = `✅ Đã qua 18h35 → Đã cập nhật KQXS hôm nay (${ck.todayStr})`;
-          statusEl.className = 'font-semibold text-emerald-400';
+        if (state.loadError && cachedDraws.length === 0) {
+          statusEl.textContent = `⚠️ Chưa tải được KQXS thật từ Internet`;
+          statusEl.className = 'font-semibold text-rose-400';
+        } else if (ck.isAfter1835) {
+          if (state.hasTodayResult) {
+            statusEl.textContent = `✅ Đã cập nhật KQXS thật hôm nay (${ck.todayStr}) • ${state.sourceName}`;
+            statusEl.className = 'font-semibold text-emerald-400';
+          } else {
+            const latestDate = cachedDraws.length > 0 ? cachedDraws[0].date : 'chưa có';
+            statusEl.textContent = `⏳ Đã qua 18h35 — Chưa có KQXS thật hôm nay (${ck.todayStr}), đang chờ nguồn cập nhật (đang dùng kỳ thật gần nhất: ${latestDate})`;
+            statusEl.className = 'font-semibold text-amber-400';
+          }
         } else {
-          statusEl.textContent = `⏳ Chưa tới 18h35 → KQXS gần nhất là hôm qua (${ck.yesterdayStr})`;
+          const latestDate = cachedDraws.length > 0 ? cachedDraws[0].date : ck.yesterdayStr;
+          statusEl.textContent = `⏳ Chưa tới 18h35 → Đang dùng KQXS thật gần nhất (${latestDate})`;
           statusEl.className = 'font-semibold text-amber-400';
         }
       }
@@ -304,7 +318,7 @@
           : `Đếm ngược 18h35 hôm nay: còn ${ck.countdownStr}`;
       }
       if (targetEl) {
-        targetEl.textContent = `Soi cho kỳ: ${ck.predictionTargetDate} (18h35)`;
+        targetEl.textContent = `Phân tích cho kỳ: ${ck.predictionTargetDate} (18h35)`;
       }
 
       if (!state.wasAfter1835 && ck.isAfter1835) {
@@ -316,61 +330,100 @@
     }
 
     setInterval(updateClockBanner, 1000);
+    Monetization.init({ onChange: function () { if (cachedPredictions) renderUI(); } });
 
-    async function syncFromInternet() {
+    function scheduleWaitingPoll() {
+      if (waitingPollTimer) clearTimeout(waitingPollTimer);
+      if (!state.waitingForTodayDraw || waitingPollAttempts >= 20) return;
+      waitingPollAttempts++;
+      waitingPollTimer = setTimeout(() => {
+        syncFromInternet(true);
+      }, 30000);
+    }
+
+    async function syncFromInternet(isBackgroundRetry = false) {
+      if (!isBackgroundRetry) waitingPollAttempts = 0;
       updateClockBanner();
       const ck = getVietnamClockInfo();
       const pill = document.getElementById('live-status-pill');
       const btn = document.getElementById('btn-sync-net');
-      if (pill) {
-        pill.textContent = '🔄 Đang đồng bộ KQXS 18h35...';
+      if (pill && !isBackgroundRetry) {
+        pill.textContent = '🔄 Đang tải KQXS Miền Bắc thật...';
         pill.className = 'px-2.5 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono';
       }
       if (btn) btn.disabled = true;
 
       try {
-        const res = await fetchLiveDrawsFromInternet(state.region);
+        const res = await fetchLiveDrawsFromInternet();
         cachedDraws = res.draws;
         state.isLiveInternet = true;
+        state.hasTodayResult = res.hasTodayResult;
+        state.waitingForTodayDraw = res.waitingForTodayDraw;
+        state.loadError = null;
         state.sourceName = res.source;
         state.dateStr = cachedDraws[0].date;
         state.predictForDate = ck.predictionTargetDate;
         state.viewingDrawIdx = 0;
 
         if (pill) {
-          pill.textContent = `🟢 Đã cập nhật 18h35 • Kỳ ${cachedDraws[0].date}`;
-          pill.className = 'px-2.5 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono';
+          if (state.hasTodayResult) {
+            pill.textContent = `🟢 KQXS thật hôm nay • Kỳ ${cachedDraws[0].date}`;
+            pill.className = 'px-2.5 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono';
+          } else if (state.waitingForTodayDraw) {
+            pill.textContent = `⏳ Chờ KQXS hôm nay • Kỳ thật: ${cachedDraws[0].date}`;
+            pill.className = 'px-2.5 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono';
+          } else {
+            pill.textContent = `🟢 KQXS thật • Kỳ ${cachedDraws[0].date}`;
+            pill.className = 'px-2.5 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono';
+          }
         }
       } catch (err) {
-        let loadedCache = null;
-        try {
-          const raw = localStorage.getItem('LOTO_AI_LIVE_CACHE_' + state.region);
-          if (raw) loadedCache = JSON.parse(raw);
-        } catch (_) {}
-
-        if (loadedCache && loadedCache.length > 0) {
-          const aligned = alignDrawsWith1835Cutoff(loadedCache, state.region, ck);
-          cachedDraws = aligned.draws;
-          state.isLiveInternet = true;
-          state.sourceName = 'Dữ liệu 18h35 (' + cachedDraws[0].date + ')';
-          state.dateStr = cachedDraws[0].date;
-        } else {
-          cachedDraws = buildHistoricalDraws(state.region, ck.expectedLatestDrawDate, null);
+        const cached = loadCachedRealDraws(ck);
+        if (cached && cached.draws.length > 0) {
+          cachedDraws = cached.draws;
           state.isLiveInternet = false;
-          state.sourceName = 'Chuẩn hóa 18h35 (' + cachedDraws[0].date + ')';
+          state.hasTodayResult = cached.hasTodayResult;
+          state.waitingForTodayDraw = cached.waitingForTodayDraw;
+          state.loadError = null;
+          state.sourceName = cached.source;
           state.dateStr = cachedDraws[0].date;
-        }
-        if (pill) {
-          pill.textContent = `🟢 KQXS 18h35 • Kỳ ${state.dateStr}`;
-          pill.className = 'px-2.5 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono';
+          if (pill) {
+            pill.textContent = `🟡 Cache dữ liệu thật • Kỳ ${state.dateStr}`;
+            pill.className = 'px-2.5 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono';
+          }
+        } else {
+          cachedDraws = [];
+          cachedEvaluation = null;
+          cachedPredictions = null;
+          cachedPresetRanking = null;
+          state.isLiveInternet = false;
+          state.hasTodayResult = false;
+          state.waitingForTodayDraw = false;
+          state.loadError = 'Không tải được dữ liệu KQXS Miền Bắc thật từ Internet. Vui lòng kiểm tra mạng và thử lại.';
+          state.sourceName = 'Chưa có kết nối dữ liệu thật';
+          if (pill) {
+            pill.textContent = '🔴 Mất kết nối dữ liệu thật';
+            pill.className = 'px-2.5 py-0.5 text-xs rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 font-mono';
+          }
         }
       } finally {
         if (btn) btn.disabled = false;
       }
 
-      cachedEvaluation = evaluateAllNumbers(cachedDraws);
-      cachedPresetRanking = rankPresetStrategies(cachedDraws, 8, state.danSize);
-      recomputeScoresOnly();
+      if (state.waitingForTodayDraw) {
+        scheduleWaitingPoll();
+      } else if (waitingPollTimer) {
+        clearTimeout(waitingPollTimer);
+        waitingPollTimer = null;
+      }
+
+      if (cachedDraws.length > 0) {
+        cachedEvaluation = evaluateAllNumbers(cachedDraws);
+        cachedPresetRanking = rankPresetStrategies(cachedDraws, 8, state.danSize);
+        recomputeScoresOnly();
+      } else {
+        renderUI();
+      }
     }
 
     function recomputeScoresOnly() {
@@ -444,6 +497,7 @@
      * 2. Proactively LOCK all 10 sliders below ("khi ấn vào các thuật toán trên thì chủ động khóa thanh dưới lại")
      */
     function setPreset(presetId) {
+      if (!Monetization.canUsePremium()) { Monetization.openPaywall(); return; }
       const found = PRESET_STRATEGIES.find(p => p.id === presetId);
       if (!found) return;
       state.activePresetId = presetId;
@@ -475,18 +529,6 @@
         state.favoriteInput = inp.value.trim();
       }
       setMode('sobanket');
-    }
-
-    function changeRegion(reg) {
-      state.region = reg;
-      ['xsmb', 'xsmn', 'xsmt'].forEach(r => {
-        const btn = document.getElementById('reg-' + r);
-        btn.className = r === reg
-          ? 'px-3 py-1.5 rounded-lg font-bold bg-blue-600 text-white transition'
-          : 'px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition';
-      });
-      state.selectedNum = null;
-      syncFromInternet();
     }
 
     function setMode(m) {
@@ -549,8 +591,10 @@
     }
 
     function renderAlgorithmsPanel() {
-      const ranking = cachedPresetRanking || rankPresetStrategies(cachedDraws, 8, state.danSize);
-      const best = ranking.bestPreset;
+      const lockedNow = !Monetization.canUsePremium();
+      const hasData = cachedDraws && cachedDraws.length > 0;
+      const ranking = hasData ? (cachedPresetRanking || rankPresetStrategies(cachedDraws, 8, state.danSize)) : null;
+      const best = ranking ? ranking.bestPreset : null;
 
       // Update active preset labels
       const activeLabel = getActivePresetLabel();
@@ -562,14 +606,22 @@
       // Update Kiểm Chứng tab button label with best win rate
       const btTabBtn = document.getElementById('mode-backtest');
       if (btTabBtn) {
-        btTabBtn.innerHTML = `✅ Kiểm Chứng <span class="block text-xs font-mono text-amber-300">Đỉnh: ${best.backtest.danWinRate}%</span>`;
+        const subText = !Monetization.canUsePremium()
+          ? '🔒 VIP'
+          : (best ? 'Đỉnh: ' + best.backtest.danWinRate + '%' : 'Chờ dữ liệu');
+        btTabBtn.innerHTML = `✅ Kiểm Chứng <span class="block text-xs font-mono text-amber-300">${subText}</span>`;
       }
 
       // Render Best Preset Suggestion Banner above the 6 cards
       const suggEl = document.getElementById('best-preset-suggestion-banner');
       if (suggEl) {
-        const isCurrentBest = state.activePresetId === best.id;
-        suggEl.innerHTML = `
+        if (lockedNow) {
+          suggEl.innerHTML = Monetization.renderLockBanner();
+        } else if (!best) {
+          suggEl.innerHTML = `<div class="text-slate-300">⏳ Đang chờ tải dữ liệu XSMB thật để xếp hạng 6 bộ thuật toán...</div>`;
+        } else {
+          const isCurrentBest = state.activePresetId === best.id;
+          suggEl.innerHTML = `
           <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-1.5">
               <span class="px-2 py-0.5 rounded-md bg-emerald-500 text-slate-950 font-extrabold text-xs">👑 GỢI Ý TỪ KIỂM CHỨNG</span>
@@ -585,14 +637,16 @@
             }
           </div>
         `;
+        }
       }
 
       // Render 6 Large Elevated 3D Preset Cards
       const gridEl = document.getElementById('preset-cards-grid');
       if (gridEl) {
-        gridEl.innerHTML = ranking.presets.map(p => {
+        const presetList = ranking ? ranking.presets : PRESET_STRATEGIES.map(p => ({ ...p, isBest: false, backtest: null }));
+        gridEl.innerHTML = presetList.map(p => {
           const isActive = state.activePresetId === p.id;
-          const isBest = p.isBest;
+          const isBest = p.isBest && !lockedNow;
           let cardStyle = 'bg-slate-950/90 border-slate-800 text-slate-300 hover:border-slate-600';
           if (isActive && isBest) {
             cardStyle = 'bg-gradient-to-br from-emerald-950 via-blue-950 to-slate-900 border-emerald-400 text-white preset-card-active best-glow';
@@ -604,7 +658,7 @@
 
           return `
             <button onclick="setPreset('${p.id}')" class="preset-card relative p-3.5 rounded-2xl border-2 text-left flex flex-col justify-between gap-1.5 ${cardStyle}">
-              ${isBest ? `
+              ${isBest && p.backtest ? `
                 <div class=" -mt-1 mb-0.5 flex items-center justify-between">
                   <span class="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-emerald-400 text-slate-950 font-extrabold text-xs shadow">
                     👑 NỔ NHIỀU NHẤT
@@ -614,7 +668,7 @@
               ` : `
                 <div class="flex items-center justify-between text-xs">
                   <span class="text-slate-400 font-mono">Tỷ lệ nổ dàn:</span>
-                  <span class="font-mono font-bold ${isActive ? 'text-blue-300' : 'text-slate-300'}">${p.backtest.danWinRate}% (${p.totalMatchedCount} nháy)</span>
+                  <span class="font-mono font-bold ${isActive ? 'text-blue-300' : 'text-slate-300'}">${lockedNow ? '🔒 VIP' : (p.backtest ? p.backtest.danWinRate + '% (' + p.totalMatchedCount + ' nháy)' : '--')}</span>
                 </div>
               `}
               <div class="flex items-center gap-2">
@@ -625,7 +679,7 @@
                 </div>
               </div>
               <div class="pt-1 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
-                <span>B.Thủ: <b class="text-amber-300">${p.topBachThu}</b> (${p.topBachThuPct}%)</span>
+                <span>B.Thủ: ${lockedNow ? '<b class="text-slate-500">🔒 VIP</b>' : (p.topBachThu ? '<b class="text-amber-300">' + p.topBachThu + '</b> (' + p.topBachThuPct + '%)' : '--')}</span>
                 <span class="${isActive ? 'text-emerald-400 font-bold' : 'text-slate-500'}">${isActive ? '🔒 Đang dùng' : 'Chạm để chọn'}</span>
               </div>
             </button>
@@ -689,20 +743,40 @@
         `;
       }).join('');
 
-      document.getElementById('config-code-input').value = getConfigSignature(state.region, state.dateStr, state.weights);
+      document.getElementById('config-code-input').value = getConfigSignature(state.dateStr, state.weights);
     }
 
     function renderModeContent() {
       const panel = document.getElementById('mode-content-panel');
+      if (!cachedEvaluation || !cachedPredictions) {
+        if (state.loadError) {
+          document.getElementById('base-draw-label').textContent = 'Chưa có dữ liệu';
+          document.getElementById('base-special-prize').textContent = '-----';
+          document.getElementById('base-first-prize').textContent = '-----';
+          panel.innerHTML = `
+            <div class="p-6 text-center space-y-3">
+              <div class="text-4xl">📡</div>
+              <div class="font-extrabold text-base text-rose-300">${state.loadError}</div>
+              <p class="text-xs text-slate-400">Ứng dụng chỉ sử dụng 100% kết quả Xổ Số Miền Bắc thật từ Internet và không tạo dữ liệu giả.</p>
+              <button onclick="syncFromInternet()" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm transition">
+                🔄 Thử tải lại KQXS Miền Bắc thật
+              </button>
+            </div>
+          `;
+        }
+        return;
+      }
       const p = cachedPredictions;
       const latest = cachedEvaluation.latestDraw;
 
-      document.getElementById('base-draw-label').textContent = `${latest.date} (100 kỳ)`;
+      document.getElementById('base-draw-label').textContent = `${latest.date} (${cachedDraws.length} kỳ thật)`;
       document.getElementById('base-special-prize').textContent = latest.specialPrize;
       document.getElementById('base-first-prize').textContent = latest.firstPrize;
       updateClockBanner();
 
-      if (state.mode === 'sobanket') {
+      if (state.mode !== 'ketqua' && !Monetization.canUsePremium()) {
+        panel.innerHTML = Monetization.renderLockedPanel();
+      } else if (state.mode === 'sobanket') {
         const favEval = evaluateFavoriteNumbers(cachedEvaluation, state.weights, state.favoriteInput || '68');
         const activeLabel = getActivePresetLabel();
 
@@ -821,18 +895,15 @@
           { label: 'G.6', items: pt.G6 || [], cols: 'grid-cols-3' },
           { label: 'G.7', items: pt.G7 || [], cols: 'grid-cols-4' }
         ];
-        if (pt.G8 && pt.G8.length > 0) {
-          prizeRows.push({ label: 'G.8', items: pt.G8, cols: 'grid-cols-1' });
-        }
 
         panel.innerHTML = `
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
             <div>
               <h3 class="font-bold text-sm text-white flex items-center gap-2">
-                <span>📋 Bảng Kết Quả Xổ Số ${state.region.toUpperCase()}</span>
+                <span>📋 Bảng Kết Quả Xổ Số Miền Bắc (XSMB)</span>
                 <span class="px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30 font-mono text-xs">Ngày ${draw.date}</span>
               </h3>
-              <p class="text-xs text-slate-400">Nguồn: ${draw.source || state.sourceName} • Chạm vào số bất kỳ để xem % nổ kỳ tới</p>
+              <p class="text-xs text-slate-400">Nguồn: ${draw.source || state.sourceName} • Chạm vào số bất kỳ để xem % thống kê kỳ tới</p>
             </div>
             <div class="flex items-center gap-1 text-xs font-mono">
               <button onclick="selectDrawIndex(${state.viewingDrawIdx + 1})" ${state.viewingDrawIdx >= cachedDraws.length - 1 ? 'disabled' : ''} class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40">◀ Kỳ trước</button>
@@ -1124,7 +1195,8 @@
           </div>
         `;
       } else if (state.mode === 'backtest') {
-        const ranking = cachedPresetRanking || rankPresetStrategies(cachedDraws, 8, state.danSize);
+        const lockedNow = !Monetization.canUsePremium();
+      const ranking = cachedPresetRanking || rankPresetStrategies(cachedDraws, 8, state.danSize);
         const best = ranking.bestPreset;
         const bt = runHistoricalBacktest(cachedDraws, state.weights, 8, state.danSize);
         const totalNhay = bt.history.reduce((acc, r) => acc + r.danMatched.length, 0);
@@ -1223,6 +1295,11 @@
 
     function renderSelectedNumberCard() {
       const card = document.getElementById('selected-number-card');
+      if (!cachedPredictions) {
+        card.innerHTML = `<div class="text-xs text-slate-400">⏳ Chưa có dữ liệu KQXS thật để phân tích chi tiết 10 thuật toán.</div>`;
+        return;
+      }
+      if (!Monetization.canUsePremium()) { card.innerHTML = Monetization.renderLockedCard(); return; }
       const item = cachedPredictions.byNumMap[state.selectedNum] || cachedPredictions.ranked[0];
 
       card.innerHTML = `
@@ -1277,19 +1354,23 @@
     }
 
     function promptImportCode() {
-      const code = prompt('Dán Mã đồng bộ cấu hình %:');
+      const code = prompt('Dán Mã đồng bộ cấu hình % (VD: XSMB-20261123-[14.12.14.14.12.8.8.8.5.5]):');
       if (!code) return;
-      const match = code.trim().match(/^(XSMB|XSMN|XSMT)-(\d{4})(\d{2})(\d{2})-\[([0-9.]+)\]$/i);
-      if (!match) return alert('Mã không đúng định dạng!');
-      const reg = match[1].toLowerCase();
-      const parts = match[5].split('.').map(x => parseInt(x, 10) || 0);
+      const match = code.trim().match(/^XSMB-(\d{4})(\d{2})(\d{2})-\[([0-9.]+)\]$/i);
+      if (!match) return alert('Mã không đúng định dạng XSMB!');
+      const parts = match[4].split('.').map(x => parseInt(x, 10) || 0);
       if (parts.length !== ALGORITHMS.length) return alert('Số lượng thuật toán không khớp!');
       state.activePresetId = 'custom';
       ALGORITHMS.forEach((a, idx) => {
         state.weights[a.id] = parts[idx];
         state.locked[a.id] = true;
       });
-      changeRegion(reg);
+      state.selectedNum = null;
+      if (cachedEvaluation) {
+        recomputeScoresOnly();
+      } else {
+        renderUI();
+      }
     }
 
     function copyDanNumbers() {

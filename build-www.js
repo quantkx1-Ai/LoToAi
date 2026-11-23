@@ -19,7 +19,7 @@ function copyIfExists(srcPath, destPath) {
   if (fs.existsSync(srcPath)) {
     ensureDir(path.dirname(destPath));
     fs.copyFileSync(srcPath, destPath);
-    console.log('✓ Đã đóng gói:', path.relative(WWW, destPath));
+    console.log('✓ Đã đóng gói:', path.relative(ROOT, destPath));
     return true;
   }
   return false;
@@ -45,20 +45,18 @@ const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" w
 
 fs.writeFileSync(path.join(WWW_ICONS, 'icon-512.svg'), iconSvg, 'utf8');
 fs.writeFileSync(path.join(WWW, 'icon-512.svg'), iconSvg, 'utf8');
+fs.writeFileSync(path.join(ROOT, 'icon-512.svg'), iconSvg, 'utf8');
 
-['index.html', 'privacy-policy.html', 'manifest.json', 'sw.js'].forEach(file => {
+['index.html', 'privacy-policy.html', 'manifest.json', 'sw.js', 'monetization.js'].forEach(file => {
   copyIfExists(path.join(ROOT, file), path.join(WWW, file));
 });
 
-// Copy engine.js whether located at root or js/engine.js
+// Canonical engine.js at root -> sync to js/engine.js, www/engine.js, www/js/engine.js
 const engRoot = path.join(ROOT, 'engine.js');
-const engSub = path.join(ROOT, 'js', 'engine.js');
 if (fs.existsSync(engRoot)) {
+  copyIfExists(engRoot, path.join(ROOT, 'js', 'engine.js'));
   copyIfExists(engRoot, path.join(WWW, 'engine.js'));
   copyIfExists(engRoot, path.join(WWW_JS, 'engine.js'));
-} else if (fs.existsSync(engSub)) {
-  copyIfExists(engSub, path.join(WWW, 'engine.js'));
-  copyIfExists(engSub, path.join(WWW_JS, 'engine.js'));
 }
 
 console.log('🎉 Đóng gói thư mục www/ hoàn tất!');
