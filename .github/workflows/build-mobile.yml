@@ -1,4 +1,4 @@
-name: Build Android (.AAB/.APK) & iOS App
+name: Build Signed Android (.AAB/.APK) & iOS App
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-android:
-    name: Build Android (.APK & .AAB cho CH Play)
+    name: Build Signed Android (.APK & .AAB cho CH Play)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -36,17 +36,27 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug bundleRelease
 
+      - name: Generate Release Keystore & Sign AAB for Google Play Console
+        working-directory: ./android
+        run: |
+          keytool -genkeypair -v -keystore lotoai-release.keystore -alias lotoai -keyalg RSA -keysize 2048 -validity 10000 -storepass lotoai123456 -keypass lotoai123456 -dname "CN=LotoAI Pro, OU=Mobile, O=QuantkAI, L=Hanoi, S=HN, C=VN"
+          AAB_PATH=$(find app/build/outputs/bundle/release -name "*.aab" | head -n 1)
+          cp "$AAB_PATH" app-release-signed.aab
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore lotoai-release.keystore -storepass lotoai123456 -keypass lotoai123456 app-release-signed.aab lotoai
+
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: LotoAI-Pro-Android-APK
           path: android/app/build/outputs/apk/debug/*.apk
 
-      - name: Upload Google Play AAB Artifact
+      - name: Upload Signed Google Play AAB & Keystore Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LotoAI-Pro-GooglePlay-AAB
-          path: android/app/build/outputs/bundle/release/*.aab
+          name: LotoAI-Pro-Signed-GooglePlay-AAB
+          path: |
+            android/app-release-signed.aab
+            android/lotoai-release.keystore
 
   build-ios:
     name: Build iOS Project (Xcode on macOS)
