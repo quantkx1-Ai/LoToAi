@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>LotoAI Pro — Xem KQXS Trực Tiếp & Soi Cầu 10 Thuật Toán Tất Định</title>
+  <link rel="manifest" href="./manifest.json" />
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <script src="./engine.js"></script>
+  <script>if (!window.LotoAIEngine) document.write('<script src="./js/engine.js"><\/script>');</script>
+  <style>
+    body {
+      background-color: #0b1120;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+  <!-- App Top Bar -->
+  <header class="sticky top-0 z-30 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-3 py-2.5">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center font-extrabold text-sm shadow-lg shadow-blue-600/30">AI</div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-sm sm:text-base tracking-tight">LotoAI Pro</h1>
+            <span id="live-status-pill" class="px-2 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono">
+              🌐 Đang tải KQXS từ Internet...
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Xem KQXS trực tiếp 27 giải • 10 thuật toán tất định 100% (Không Random)</p>
+        </div>
+      </div>
+
+      <!-- Region & Live Internet Sync Controls -->
+      <div class="flex flex-wrap items-center gap-1.5 text-xs">
+        <div class="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700">
+          <button onclick="changeRegion('xsmb')" id="reg-xsmb" class="px-2.5 py-1 rounded-md font-semibold bg-blue-600 text-white transition">Miền Bắc</button>
+          <button onclick="changeRegion('xsmn')" id="reg-xsmn" class="px-2.5 py-1 rounded-md font-medium text-slate-300 hover:text-white transition">Miền Nam</button>
+          <button onclick="changeRegion('xsmt')" id="reg-xsmt" class="px-2.5 py-1 rounded-md font-medium text-slate-300 hover:text-white transition">Miền Trung</button>
+        </div>
+        <button onclick="syncFromInternet()" id="btn-sync-net" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition flex items-center gap-1">
+          <span>🔄 Tải KQXS Internet</span>
+        </button>
+        <button onclick="toggleCustomModal()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-400 font-medium transition">
+          ✏️ Nhập Tay
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Grid -->
+  <main class="max-w-6xl w-full mx-auto flex-1 p-3 grid grid-cols-1 lg:grid-cols-12 gap-4">
+    
+    <!-- Left Column: 10-Algorithm 100% Weight Splitter (5 cols) -->
+    <section class="lg:col-span-5 flex flex-col gap-3">
+      <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-xl">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="font-bold text-sm flex items-center gap-1.5">
+              <span>⚖️ Chia Tỷ Trọng 10 Thuật Toán</span>
+            </h2>
+            <p class="text-xs text-slate-400">Cùng tỷ trọng % + cùng kỳ KQXS ⇒ Kết quả giống nhau 100%</p>
+          </div>
+          <span id="total-pct-badge" class="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-mono font-bold text-xs">Tổng: 100%</span>
+        </div>
+
+        <!-- 100% Stacked Bar -->
+        <div id="weight-stacked-bar" class="w-full h-3.5 rounded-full overflow-hidden flex bg-slate-800 border border-slate-700"></div>
+
+        <!-- Quick Presets -->
+        <div class="grid grid-cols-4 gap-1.5 text-xs">
+          <button onclick="setPreset('default')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium transition">Chuẩn Tối Ưu</button>
+          <button onclick="setPreset('equal')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium transition">Đều (10%×10)</button>
+          <button onclick="setPreset('bridge')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium transition">Chuyên Cầu/Nhớ</button>
+          <button onclick="setPreset('ai')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium transition">Chuyên Markov/AI</button>
+        </div>
+
+        <!-- 10 Sliders List -->
+        <div id="algorithms-list" class="space-y-2 max-h-[420px] overflow-y-auto pr-1"></div>
+
+        <!-- Deterministic Config Signature Box -->
+        <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-400 font-medium">🔑 Mã đồng bộ % (Đảm bảo mọi máy ra cùng KQ):</span>
+            <button onclick="copyConfigCode()" id="btn-copy-code" class="text-blue-400 hover:underline font-medium">Sao chép mã</button>
+          </div>
+          <div class="flex gap-1.5">
+            <input id="config-code-input" type="text" readonly class="w-full px-2 py-1 rounded bg-slate-900 border border-slate-800 font-mono text-xs text-emerald-400" />
+            <button onclick="promptImportCode()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 whitespace-nowrap">Nhập mã</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Lottery Result Board & Multi-Mode Soi Cầu (7 cols) -->
+    <section class="lg:col-span-7 flex flex-col gap-3">
+      
+      <!-- Today's Base Result Banner -->
+      <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-3">
+          <div>
+            <span class="text-slate-400 block">Kỳ KQXS mới nhất:</span>
+            <span id="base-draw-label" class="font-bold text-slate-200 font-mono">Đang tải...</span>
+          </div>
+          <div class="h-7 w-px bg-slate-800"></div>
+          <div>
+            <span class="text-slate-400 block">Giải Đặc Biệt:</span>
+            <span id="base-special-prize" class="font-mono font-bold text-base text-rose-400 tracking-wider">-----</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block">Giải Nhất:</span>
+            <span id="base-first-prize" class="font-mono font-bold text-sm text-amber-400">-----</span>
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="text-slate-400 block">Nguồn dữ liệu:</span>
+          <span id="data-source-label" class="font-semibold text-emerald-400">Trực tiếp Internet</span>
+        </div>
+      </div>
+
+      <!-- Mode Navigation Tabs (7 Tabs including Bảng Kết Quả Xổ Số!) -->
+      <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 text-xs">
+        <button onclick="setMode('ketqua')" id="mode-ketqua" class="py-2 px-1.5 rounded-xl font-semibold bg-blue-600 text-white transition text-center">📋 Xem KQXS</button>
+        <button onclick="setMode('bachthu')" id="mode-bachthu" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">🎯 Bạch Thủ</button>
+        <button onclick="setMode('songthu')" id="mode-songthu" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">⚖️ Song Thủ</button>
+        <button onclick="setMode('danso')" id="mode-danso" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">🔢 Dàn N Số</button>
+        <button onclick="setMode('xien')" id="mode-xien" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">🔗 Xiên/Chạm</button>
+        <button onclick="setMode('matrix100')" id="mode-matrix100" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">📊 100 Số</button>
+        <button onclick="setMode('backtest')" id="mode-backtest" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">✅ Kiểm Chứng</button>
+      </div>
+
+      <!-- Dynamic Mode Content Panel -->
+      <div id="mode-content-panel" class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-xl min-h-[340px]">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- Deep-Dive 10-Algorithm Inspector for Selected Number -->
+      <div id="selected-number-card" class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+        <!-- Rendered by JS -->
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Store Compliance Footer (Bắt buộc khi duyệt CH Play & App Store) -->
+  <footer class="max-w-6xl w-full mx-auto px-3 py-3 border-t border-slate-800/80 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
+    <div>
+      🛡️ <b>Tuyên bố tuân thủ:</b> Ứng dụng chỉ phục vụ tra cứu kết quả Xổ số kiến thiết và phân tích thống kê toán học. Tuyệt đối không tổ chức cá cược hay giao dịch tiền thật (18+).
+    </div>
+    <a href="./privacy-policy.html" class="text-blue-400 hover:underline font-medium">📜 Chính sách bảo mật & Điều khoản</a>
+  </footer>
+
+  <!-- Modal Nhập KQXS Thực Tế -->
+  <div id="custom-kq-modal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-4 space-y-3 text-xs">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 class="font-bold text-sm">✏️ Nhập Kết Quả Xổ Số Kỳ Hiện Tại</h3>
+        <button onclick="toggleCustomModal()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-slate-300 mb-1">Giải Đặc Biệt (5 số):</label>
+          <input id="inp-special" type="text" maxlength="6" placeholder="VD: 48291" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 font-mono text-sm" />
+        </div>
+        <div>
+          <label class="block text-slate-300 mb-1">Giải Nhất (5 số):</label>
+          <input id="inp-first" type="text" maxlength="5" placeholder="VD: 73604" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 font-mono text-sm" />
+        </div>
+      </div>
+      <div>
+        <label class="block text-slate-300 mb-1">Các số Loto 2 số cuối khác đã về:</label>
+        <textarea id="inp-lotos" rows="2" placeholder="VD: 15, 27, 39, 68" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 font-mono text-xs"></textarea>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="resetCustomResult()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">Khôi phục</button>
+        <button onclick="applyCustomResult()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold">Áp dụng & Tính Toán</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const {
+      ALGORITHMS,
+      pad2,
+      reverse2,
+      fetchLiveDrawsFromInternet,
+      buildHistoricalDraws,
+      evaluateAllNumbers,
+      computePredictions,
+      runHistoricalBacktest,
+      getConfigSignature
+    } = window.LotoAIEngine;
+
+    let state = {
+      region: 'xsmb',
+      dateStr: new Date().toISOString().slice(0, 10),
+      mode: 'ketqua', // Starts on 📋 Xem KQXS so user immediately sees the full lottery results board!
+      viewingDrawIdx: 0, // 0 = latest draw, 1 = yesterday, ... up to 99
+      danSize: 10,
+      selectedNum: null,
+      customOverride: null,
+      isLiveInternet: false,
+      sourceName: 'Đang kết nối Internet...',
+      weights: {},
+      locked: {}
+    };
+
+    ALGORITHMS.forEach(a => {
+      state.weights[a.id] = a.defaultWeight;
+      state.locked[a.id] = false;
+    });
+
+    let cachedDraws = [];
+    let cachedEvaluation = null;
+    let cachedPredictions = null;
+
+    // Fetch live lottery draws from the internet automatically
+    async function syncFromInternet() {
+      const pill = document.getElementById('live-status-pill');
+      const btn = document.getElementById('btn-sync-net');
+      if (pill) {
+        pill.textContent = '🔄 Đang tải KQXS trực tiếp từ Internet...';
+        pill.className = 'px-2 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono';
+      }
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetchLiveDrawsFromInternet(state.region);
+        cachedDraws = res.draws;
+        state.isLiveInternet = true;
+        state.sourceName = res.source;
+        state.dateStr = cachedDraws[0].date;
+        state.viewingDrawIdx = 0;
+
+        if (pill) {
+          pill.textContent = '🟢 Trực tiếp Internet • Kỳ ' + cachedDraws[0].date;
+          pill.className = 'px-2 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono';
+        }
+      } catch (err) {
+        // Check localStorage cache first
+        let loadedCache = null;
+        try {
+          const raw = localStorage.getItem('LOTO_AI_LIVE_CACHE_' + state.region);
+          if (raw) loadedCache = JSON.parse(raw);
+        } catch (_) {}
+
+        if (loadedCache && loadedCache.length > 0) {
+          cachedDraws = loadedCache;
+          state.isLiveInternet = true;
+          state.sourceName = 'Bộ nhớ đệm Internet (' + cachedDraws[0].date + ')';
+          state.dateStr = cachedDraws[0].date;
+        } else {
+          cachedDraws = buildHistoricalDraws(state.region, state.dateStr, state.customOverride);
+          state.isLiveInternet = false;
+          state.sourceName = 'Chế độ Offline chuẩn hóa (' + cachedDraws[0].date + ')';
+        }
+        if (pill) {
+          pill.textContent = state.isLiveInternet ? ('🟢 Cache Internet • ' + state.dateStr) : ('⚡ Offline • ' + state.dateStr);
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+
+      cachedEvaluation = evaluateAllNumbers(cachedDraws);
+      recomputeScoresOnly();
+    }
+
+    function recomputeScoresOnly() {
+      cachedPredictions = computePredictions(cachedEvaluation, state.weights, { danSize: state.danSize });
+      if (!state.selectedNum || !cachedPredictions.byNumMap[state.selectedNum]) {
+        state.selectedNum = cachedPredictions.ranked[0].num;
+      }
+      renderUI();
+    }
+
+    function updateWeight(changedId, newVal) {
+      if (state.locked[changedId]) return;
+      let lockedSum = 0;
+      const unlockedIds = [];
+      ALGORITHMS.forEach(a => {
+        if (state.locked[a.id]) lockedSum += state.weights[a.id];
+        else if (a.id !== changedId) unlockedIds.push(a.id);
+      });
+
+      const maxAllowed = Math.max(0, 100 - lockedSum);
+      newVal = Math.max(0, Math.min(maxAllowed, parseInt(newVal, 10) || 0));
+
+      if (unlockedIds.length === 0) {
+        state.weights[changedId] = maxAllowed;
+        recomputeScoresOnly();
+        return;
+      }
+
+      state.weights[changedId] = newVal;
+      const remaining = maxAllowed - newVal;
+      let otherSum = 0;
+      unlockedIds.forEach(id => { otherSum += state.weights[id]; });
+
+      let allocated = 0;
+      unlockedIds.forEach((id, idx) => {
+        if (idx === unlockedIds.length - 1) {
+          state.weights[id] = Math.max(0, remaining - allocated);
+        } else if (otherSum === 0) {
+          const share = Math.floor(remaining / unlockedIds.length);
+          state.weights[id] = share;
+          allocated += share;
+        } else {
+          const share = Math.round((state.weights[id] / otherSum) * remaining);
+          state.weights[id] = share;
+          allocated += share;
+        }
+      });
+
+      state.selectedNum = null;
+      recomputeScoresOnly();
+    }
+
+    function toggleLock(algId) {
+      state.locked[algId] = !state.locked[algId];
+      renderAlgorithmsPanel();
+    }
+
+    function setPreset(type) {
+      ALGORITHMS.forEach(a => { state.locked[a.id] = false; });
+      if (type === 'default') ALGORITHMS.forEach(a => { state.weights[a.id] = a.defaultWeight; });
+      else if (type === 'equal') ALGORITHMS.forEach(a => { state.weights[a.id] = 10; });
+      else if (type === 'bridge') {
+        const map = { ema: 8, weibull: 8, markov: 10, bridge: 26, apriori: 22, gaussian: 5, fourier: 6, lstm: 5, chisquare: 4, shadow: 6 };
+        ALGORITHMS.forEach(a => { state.weights[a.id] = map[a.id]; });
+      } else if (type === 'ai') {
+        const map = { ema: 16, weibull: 14, markov: 24, bridge: 8, apriori: 8, gaussian: 5, fourier: 5, lstm: 14, chisquare: 4, shadow: 2 };
+        ALGORITHMS.forEach(a => { state.weights[a.id] = map[a.id]; });
+      }
+      state.selectedNum = null;
+      recomputeScoresOnly();
+    }
+
+    function changeRegion(reg) {
+      state.region = reg;
+      ['xsmb', 'xsmn', 'xsmt'].forEach(r => {
+        const btn = document.getElementById('reg-' + r);
+        btn.className = r === reg
+          ? 'px-2.5 py-1 rounded-md font-semibold bg-blue-600 text-white transition'
+          : 'px-2.5 py-1 rounded-md font-medium text-slate-300 hover:text-white transition';
+      });
+      state.selectedNum = null;
+      syncFromInternet();
+    }
+
+    function setMode(m) {
+      state.mode = m;
+      ['ketqua', 'bachthu', 'songthu', 'danso', 'xien', 'matrix100', 'backtest'].forEach(id => {
+        const btn = document.getElementById('mode-' + id);
+        btn.className = id === m
+          ? 'py-2 px-1.5 rounded-xl font-semibold bg-blue-600 text-white transition text-center'
+          : 'py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center';
+      });
+      renderModeContent();
+    }
+
+    function selectDrawIndex(idx) {
+      state.viewingDrawIdx = Math.max(0, Math.min(cachedDraws.length - 1, parseInt(idx, 10) || 0));
+      renderModeContent();
+    }
+
+    function setDanSize(size) {
+      state.danSize = parseInt(size, 10) || 10;
+      recomputeScoresOnly();
+    }
+
+    function inspectNum(numStr) {
+      state.selectedNum = numStr;
+      renderModeContent();
+      renderSelectedNumberCard();
+    }
+
+    // Helper to format a prize number with its last 2 digits highlighted
+    function formatPrizeHighlight(pStr, isSpecial = false) {
+      const s = String(pStr || '');
+      if (s.length <= 2) {
+        return `<span class="${isSpecial ? 'text-rose-400 text-lg font-extrabold' : 'text-amber-300 font-bold'}">${s}</span>`;
+      }
+      const prefix = s.slice(0, -2);
+      const last2 = s.slice(-2);
+      return `<span class="text-slate-300">${prefix}</span><span class="${isSpecial ? 'text-rose-400 font-extrabold underline decoration-rose-500/50' : 'text-amber-300 font-bold'}">${last2}</span>`;
+    }
+
+    function renderAlgorithmsPanel() {
+      const bar = document.getElementById('weight-stacked-bar');
+      bar.innerHTML = ALGORITHMS.map(a => {
+        const w = state.weights[a.id];
+        if (w <= 0) return '';
+        return `<div title="${a.short}: ${w}%" style="width:${w}%; background:${a.color};" class="h-full transition-all"></div>`;
+      }).join('');
+
+      const total = ALGORITHMS.reduce((acc, a) => acc + state.weights[a.id], 0);
+      document.getElementById('total-pct-badge').textContent = `Tổng: ${total}%`;
+
+      const listEl = document.getElementById('algorithms-list');
+      listEl.innerHTML = ALGORITHMS.map(a => {
+        const w = state.weights[a.id];
+        const isLocked = state.locked[a.id];
+        return `
+          <div class="p-2 rounded-xl bg-slate-950/90 border ${isLocked ? 'border-amber-500/50' : 'border-slate-800'} text-xs space-y-1">
+            <div class="flex items-center justify-between gap-1">
+              <div class="flex items-center gap-1.5 truncate">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${a.color}"></span>
+                <span class="font-semibold text-slate-200 truncate" title="${a.name}">${a.short}</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="font-mono font-bold text-slate-100 w-9 text-right">${w}%</span>
+                <button onclick="toggleLock('${a.id}')" class="px-1.5 py-0.5 rounded ${isLocked ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-800 text-slate-400'}">
+                  ${isLocked ? '🔒' : '🔓'}
+                </button>
+              </div>
+            </div>
+            <input
+              type="range" min="0" max="100" value="${w}" ${isLocked ? 'disabled' : ''}
+              onchange="updateWeight('${a.id}', this.value)"
+              oninput="this.parentElement.querySelector('span.font-mono').textContent = this.value + '%'"
+              class="w-full accent-blue-500 h-1.5 cursor-pointer disabled:opacity-40"
+            />
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('config-code-input').value = getConfigSignature(state.region, state.dateStr, state.weights);
+    }
+
+    function renderModeContent() {
+      const panel = document.getElementById('mode-content-panel');
+      const p = cachedPredictions;
+      const latest = cachedEvaluation.latestDraw;
+
+      document.getElementById('base-draw-label').textContent = `${latest.date} (100 kỳ)`;
+      document.getElementById('base-special-prize').textContent = latest.specialPrize;
+      document.getElementById('base-first-prize').textContent = latest.firstPrize;
+      document.getElementById('data-source-label').textContent = state.sourceName;
+
+      if (state.mode === 'ketqua') {
+        const draw = cachedDraws[state.viewingDrawIdx] || latest;
+        const pt = draw.prizeTable || {};
+        const sp2Str = pad2(draw.special2);
+
+        const prizeRows = [
+          { label: 'ĐB', items: pt.G0 || [draw.specialPrize], isSpecial: true, cols: 'grid-cols-1' },
+          { label: 'G.1', items: pt.G1 || [draw.firstPrize], cols: 'grid-cols-1' },
+          { label: 'G.2', items: pt.G2 || [], cols: 'grid-cols-2' },
+          { label: 'G.3', items: pt.G3 || [], cols: 'grid-cols-3' },
+          { label: 'G.4', items: pt.G4 || [], cols: 'grid-cols-4' },
+          { label: 'G.5', items: pt.G5 || [], cols: 'grid-cols-3' },
+          { label: 'G.6', items: pt.G6 || [], cols: 'grid-cols-3' },
+          { label: 'G.7', items: pt.G7 || [], cols: 'grid-cols-4' }
+        ];
+        if (pt.G8 && pt.G8.length > 0) {
+          prizeRows.push({ label: 'G.8', items: pt.G8, cols: 'grid-cols-1' });
+        }
+
+        panel.innerHTML = `
+          <!-- Draw Date Navigator -->
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+            <div>
+              <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                <span>📋 Bảng Kết Quả Xổ Số ${state.region.toUpperCase()}</span>
+                <span class="px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30 font-mono text-xs">Ngày ${draw.date}</span>
+              </h3>
+              <p class="text-xs text-slate-400">Nguồn: ${draw.source || state.sourceName} • Chạm vào số Loto để xem AI phân tích</p>
+            </div>
+            <div class="flex items-center gap-1 text-xs font-mono">
+              <button onclick="selectDrawIndex(${state.viewingDrawIdx + 1})" ${state.viewingDrawIdx >= cachedDraws.length - 1 ? 'disabled' : ''} class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40">◀ Kỳ trước</button>
+              <select onchange="selectDrawIndex(this.value)" class="px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-slate-200">
+                ${cachedDraws.map((d, idx) => `<option value="${idx}" ${idx === state.viewingDrawIdx ? 'selected' : ''}>${idx === 0 ? 'Kỳ mới nhất: ' : ''}${d.date} (ĐB: ${d.specialPrize})</option>`).join('')}
+              </select>
+              <button onclick="selectDrawIndex(${state.viewingDrawIdx - 1})" ${state.viewingDrawIdx <= 0 ? 'disabled' : ''} class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40">Kỳ sau ▶</button>
+            </div>
+          </div>
+
+          <!-- 2-Column Result Board: Full 27 Prizes Table (Left) + Loto Đầu/Đuôi Table (Right) -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+            
+            <!-- Left: Traditional Prize Board (7 cols) -->
+            <div class="md:col-span-7 rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+              <div class="bg-slate-900 px-3 py-1.5 border-b border-slate-800 flex justify-between text-xs font-semibold text-slate-300">
+                <span>Giải thưởng (${draw.prizes.length} giải)</span>
+                <span>2 số cuối tô màu = Số Loto</span>
+              </div>
+              <div class="divide-y divide-slate-800/80 text-xs font-mono">
+                ${prizeRows.map(row => `
+                  <div class="grid grid-cols-12 items-center">
+                    <div class="col-span-2 py-2 px-2.5 font-bold ${row.isSpecial ? 'text-rose-400 bg-rose-950/20' : 'text-slate-400 bg-slate-900/40'} text-center border-r border-slate-800">
+                      ${row.label}
+                    </div>
+                    <div class="col-span-10 p-1.5 grid ${row.cols} gap-1 text-center">
+                      ${row.items.map(val => {
+                        const l2 = pad2(String(val).slice(-2));
+                        return `
+                          <button onclick="inspectNum('${l2}')" class="py-1 px-1.5 rounded hover:bg-slate-800/80 transition ${row.isSpecial ? 'text-base bg-rose-950/30 border border-rose-500/30' : 'text-sm'}">
+                            ${formatPrizeHighlight(val, row.isSpecial)}
+                          </button>
+                        `;
+                      }).join('')}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Right: Bảng Loto Đầu - Đuôi 0..9 (5 cols) -->
+            <div class="md:col-span-5 rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+              <div class="bg-slate-900 px-3 py-1.5 border-b border-slate-800 flex justify-between text-xs font-semibold text-slate-300">
+                <span>Bảng Loto Đầu (0–9)</span>
+                <span>ĐB: <b class="text-rose-400 font-mono">${sp2Str}</b></span>
+              </div>
+              <div class="divide-y divide-slate-800/80 text-xs font-mono">
+                ${draw.lotoByHead.map((arr, headDigit) => {
+                  // Count duplicates for multi-hit badge
+                  const counts = {};
+                  arr.forEach(n => { counts[n] = (counts[n] || 0) + 1; });
+                  const uniqueNums = Object.keys(counts).sort();
+                  return `
+                    <div class="grid grid-cols-12 items-center">
+                      <div class="col-span-2 py-1.5 text-center font-bold text-blue-400 bg-slate-900/50 border-r border-slate-800">
+                        Đầu ${headDigit}
+                      </div>
+                      <div class="col-span-10 px-2 py-1 flex flex-wrap gap-1.5">
+                        ${uniqueNums.length === 0
+                          ? `<span class="text-slate-600 italic">Câm</span>`
+                          : uniqueNums.map(n => {
+                              const c = counts[n];
+                              const isSp = n === sp2Str;
+                              return `
+                                <button onclick="inspectNum('${n}')" class="px-1.5 py-0.5 rounded border ${isSp ? 'bg-rose-500/20 border-rose-500 text-rose-300 font-bold' : 'bg-slate-900 border-slate-800 text-slate-200 hover:border-blue-500'}">
+                                  ${n}${c > 1 ? `<sup class="text-emerald-400 font-bold ml-0.5">×${c}</sup>` : ''}
+                                </button>
+                              `;
+                            }).join('')}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+          </div>
+        `;
+      } else if (state.mode === 'bachthu') {
+        const top1 = p.bachThu.primary;
+        const top2 = p.bachThu.backup;
+        const top6 = p.ranked.slice(0, 6);
+
+        panel.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+            <div>
+              <h3 class="font-bold text-sm text-white">🎯 Chốt Bạch Thủ Lô / Đề Kỳ Kế Tiếp (1 Số Đỉnh Hội Tụ)</h3>
+              <p class="text-xs text-slate-400">Tính toán trực tiếp từ kỳ gốc ${latest.date} (ĐB: ${latest.specialPrize})</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono font-bold text-xs">
+              Điểm hội tụ: ${top1.finalScoreStr}%
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div onclick="inspectNum('${top1.num}')" class="cursor-pointer p-4 rounded-2xl bg-gradient-to-br from-blue-950/80 to-slate-950 border-2 border-blue-500 flex items-center justify-between">
+              <div class="space-y-1">
+                <span class="px-2 py-0.5 rounded bg-blue-600 text-white text-xs font-semibold">BẠCH THỦ #1</span>
+                <div class="text-4xl font-extrabold font-mono text-white tracking-wider pt-1">${top1.num}</div>
+                <div class="text-xs text-slate-300 font-mono">Xác suất hội tụ: <b class="text-emerald-400">${top1.finalScoreStr}%</b></div>
+                <div class="text-xs text-slate-400">Cầu: ${top1.bridgePos} • Markov từ ${top1.markovFrom}</div>
+              </div>
+              <div class="text-right font-mono text-xs space-y-1">
+                <div class="px-2 py-1 rounded bg-slate-900 border border-slate-800">30 kỳ: <b>${top1.hits30}</b> nháy</div>
+                <div class="px-2 py-1 rounded bg-slate-900 border border-slate-800">Gan: <b>${top1.daysAbsent}</b>/${top1.avgCycle}d</div>
+                <div class="px-2 py-1 rounded bg-slate-900 border border-slate-800">Lót đảo: <b>${reverse2(top1.num)}</b></div>
+              </div>
+            </div>
+
+            <div onclick="inspectNum('${top2.num}')" class="cursor-pointer p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 flex items-center justify-between">
+              <div class="space-y-1">
+                <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-xs font-semibold">BẠCH THỦ LÓT #2</span>
+                <div class="text-3xl font-bold font-mono text-slate-100 pt-1">${top2.num}</div>
+                <div class="text-xs text-slate-400 font-mono">Xác suất hội tụ: <b class="text-emerald-400">${top2.finalScoreStr}%</b></div>
+                <div class="text-xs text-slate-400">Cầu: ${top2.bridgePos} • Markov từ ${top2.markovFrom}</div>
+              </div>
+              <div class="text-right font-mono text-xs space-y-1">
+                <div class="px-2 py-1 rounded bg-slate-900 border border-slate-800">30 kỳ: <b>${top2.hits30}</b> nháy</div>
+                <div class="px-2 py-1 rounded bg-slate-900 border border-slate-800">Gan: <b>${top2.daysAbsent}</b>/${top2.avgCycle}d</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-xs font-semibold text-slate-400">Top 6 số dẫn đầu bảng xếp hạng 10 thuật toán:</div>
+            <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              ${top6.map(item => `
+                <button onclick="inspectNum('${item.num}')" class="p-2 rounded-xl border text-center transition ${state.selectedNum === item.num ? 'border-blue-500 bg-blue-950/40' : 'border-slate-800 bg-slate-950 hover:border-slate-700'}">
+                  <div class="text-xs font-mono text-slate-400">Hạng #${item.rank}</div>
+                  <div class="text-xl font-bold font-mono text-white my-0.5">${item.num}</div>
+                  <div class="text-xs font-mono font-semibold text-emerald-400">${item.finalScoreStr}%</div>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (state.mode === 'songthu') {
+        const bestSym = p.songThuPairs[0];
+        const top2Ind = p.songThuTop2;
+
+        panel.innerHTML = `
+          <div class="border-b border-slate-800 pb-2">
+            <h3 class="font-bold text-sm text-white">⚖️ Chốt Song Thủ Lô (Cặp Đối Xứng & Cặp Độc Lập)</h3>
+            <p class="text-xs text-slate-400">Tính xác suất hợp nhất khi đánh cặp 2 số bổ trợ nhau</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-950/80 to-slate-950 border-2 border-indigo-500 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded bg-indigo-600 text-white text-xs font-semibold">SONG THỦ ĐẢO (AB - BA)</span>
+                <span class="font-mono text-xs font-bold text-emerald-400">Xác suất nổ: ${bestSym.combinedPct}%</span>
+              </div>
+              <div class="text-3xl font-extrabold font-mono text-white tracking-wider">${bestSym.pairLabel}</div>
+              <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                <button onclick="inspectNum('${bestSym.numA.num}')" class="p-2 rounded-lg bg-slate-900 border border-slate-800 text-left hover:border-blue-500">
+                  Số <b>${bestSym.numA.num}</b>: <span class="text-emerald-400">${bestSym.numA.finalScoreStr}%</span>
+                </button>
+                <button onclick="inspectNum('${bestSym.numB.num}')" class="p-2 rounded-lg bg-slate-900 border border-slate-800 text-left hover:border-blue-500">
+                  Số <b>${bestSym.numB.num}</b>: <span class="text-emerald-400">${bestSym.numB.finalScoreStr}%</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-200 text-xs font-semibold">SONG THỦ ĐỘC LẬP (TOP 1 + TOP 2)</span>
+                <span class="font-mono text-xs font-bold text-emerald-400">Điểm TB: ${top2Ind.pairScore}%</span>
+              </div>
+              <div class="text-3xl font-extrabold font-mono text-white tracking-wider">${top2Ind.pairLabel}</div>
+              <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                <button onclick="inspectNum('${top2Ind.numA.num}')" class="p-2 rounded-lg bg-slate-900 border border-slate-800 text-left hover:border-blue-500">
+                  Số <b>${top2Ind.numA.num}</b>: <span class="text-emerald-400">${top2Ind.numA.finalScoreStr}%</span>
+                </button>
+                <button onclick="inspectNum('${top2Ind.numB.num}')" class="p-2 rounded-lg bg-slate-900 border border-slate-800 text-left hover:border-blue-500">
+                  Số <b>${top2Ind.numB.num}</b>: <span class="text-emerald-400">${top2Ind.numB.finalScoreStr}%</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-xs font-semibold text-slate-400">Top 6 cặp Song Thủ Đảo có xác suất cao nhất:</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+              ${p.songThuPairs.map((pair, idx) => `
+                <div onclick="inspectNum('${pair.numA.num}')" class="cursor-pointer p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 flex items-center justify-between">
+                  <div>
+                    <span class="text-slate-400 font-mono">#${idx + 1}</span>
+                    <div class="font-mono font-bold text-base text-white">${pair.pairLabel}</div>
+                  </div>
+                  <div class="text-right font-mono">
+                    <div class="text-emerald-400 font-bold">${pair.combinedPct}%</div>
+                    <div class="text-slate-400">Đ.cặp: ${pair.pairScore}</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (state.mode === 'danso') {
+        const d = p.danSo;
+        const quickSizes = [4, 6, 8, 10, 16, 20, 36, 50];
+
+        panel.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+            <div>
+              <h3 class="font-bold text-sm text-white">🔢 Chốt Dàn Số Tùy Chọn (${d.size} Số Chuẩn Nhất)</h3>
+              <p class="text-xs text-slate-400">Lọc tự động ${d.size} số có điểm tổng hợp cao nhất từ 100 số (00–99)</p>
+            </div>
+            <div class="flex items-center gap-2 font-mono text-xs">
+              <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200">Điểm TB: <b>${d.avgScorePct}%</b></span>
+              <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold">Độ phủ nổ: ${d.coveragePct}%</span>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex flex-wrap items-center gap-1">
+              ${quickSizes.map(sz => `
+                <button onclick="setDanSize(${sz})" class="px-2.5 py-1 rounded-lg font-mono font-semibold ${d.size === sz ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
+                  Dàn ${sz}
+                </button>
+              `).join('')}
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="range" min="2" max="64" value="${d.size}" onchange="setDanSize(this.value)" class="w-24 accent-blue-500 cursor-pointer" />
+              <span class="font-mono font-bold text-blue-400">${d.size} số</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-5 sm:grid-cols-10 gap-1.5 max-h-[210px] overflow-y-auto p-1">
+            ${d.items.map(item => `
+              <button onclick="inspectNum('${item.num}')" class="p-1.5 rounded-xl border text-center transition ${state.selectedNum === item.num ? 'border-blue-500 bg-blue-950/60' : 'border-slate-800 bg-slate-950 hover:border-slate-700'}">
+                <div class="text-sm font-bold font-mono text-white">${item.num}</div>
+                <div class="text-xs font-mono text-emerald-400">${item.finalScore.toFixed(1)}%</div>
+              </button>
+            `).join('')}
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2 text-xs">
+            <div class="font-mono text-slate-300 truncate" id="dan-copy-text">
+              ${d.sortedAsc.map(i => i.num).join(', ')}
+            </div>
+            <button onclick="copyDanNumbers()" class="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold shrink-0">
+              📋 Copy Dàn ${d.size} Số
+            </button>
+          </div>
+        `;
+      } else if (state.mode === 'xien') {
+        const { xien2, xien3, xien4 } = p.xien;
+        const topHeads = p.touchStats.heads.slice(0, 4);
+        const topTails = p.touchStats.tails.slice(0, 4);
+        const topSums = p.touchStats.sums.slice(0, 4);
+
+        panel.innerHTML = `
+          <div class="border-b border-slate-800 pb-2">
+            <h3 class="font-bold text-sm text-white">🔗 Lô Xiên (Xiên 2, 3, 4) & Thống Kê Chạm Đầu / Đuôi / Tổng</h3>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+              <div class="flex justify-between items-center">
+                <span class="font-semibold text-blue-400">XIÊN 2 CHUẨN</span>
+                <span class="font-mono font-bold text-emerald-400">${xien2.scorePct}%</span>
+              </div>
+              <div class="text-xl font-bold font-mono text-white">${xien2.numbers.map(n => n.num).join(' - ')}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+              <div class="flex justify-between items-center">
+                <span class="font-semibold text-indigo-400">XIÊN 3 CHUẨN</span>
+                <span class="font-mono font-bold text-emerald-400">${xien3.scorePct}%</span>
+              </div>
+              <div class="text-xl font-bold font-mono text-white">${xien3.numbers.map(n => n.num).join(' - ')}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+              <div class="flex justify-between items-center">
+                <span class="font-semibold text-purple-400">XIÊN 4 CHUẨN</span>
+                <span class="font-mono font-bold text-emerald-400">${xien4.scorePct}%</span>
+              </div>
+              <div class="text-xl font-bold font-mono text-white">${xien4.numbers.map(n => n.num).join(' - ')}</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+            <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+              <div class="font-semibold text-slate-300">🔥 Top Đầu Số Mạnh Nhất</div>
+              ${topHeads.map(h => `<div class="flex justify-between font-mono"><span>Đầu <b>${h.digit}</b> (${h.bestNum})</span><span class="text-emerald-400">${h.avgScore}%</span></div>`).join('')}
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+              <div class="font-semibold text-slate-300">⚡ Top Đuôi Số Mạnh Nhất</div>
+              ${topTails.map(t => `<div class="flex justify-between font-mono"><span>Đuôi <b>${t.digit}</b> (${t.bestNum})</span><span class="text-emerald-400">${t.avgScore}%</span></div>`).join('')}
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+              <div class="font-semibold text-slate-300">🎯 Top Tổng Đề Mạnh Nhất</div>
+              ${topSums.map(s => `<div class="flex justify-between font-mono"><span>Tổng <b>${s.digit}</b> (${s.bestNum})</span><span class="text-emerald-400">${s.avgScore}%</span></div>`).join('')}
+            </div>
+          </div>
+        `;
+      } else if (state.mode === 'matrix100') {
+        const all100 = [...p.ranked].sort((a, b) => a.numInt - b.numInt);
+        panel.innerHTML = `
+          <div class="border-b border-slate-800 pb-2">
+            <h3 class="font-bold text-sm text-white">📊 Bảng Nhiệt Độ Xác Suất Toàn Bộ 100 Số (00 – 99)</h3>
+          </div>
+          <div class="grid grid-cols-10 gap-1 text-xs font-mono max-h-[260px] overflow-y-auto p-0.5">
+            ${all100.map(item => {
+              let bg = 'bg-slate-950 border-slate-800 text-slate-300';
+              if (item.rank <= 3) bg = 'bg-emerald-950/90 border-emerald-500 text-emerald-300 font-bold';
+              else if (item.rank <= 10) bg = 'bg-blue-950/80 border-blue-500/60 text-blue-200 font-semibold';
+              const isSel = state.selectedNum === item.num ? 'ring-2 ring-amber-400' : '';
+              return `
+                <button onclick="inspectNum('${item.num}')" class="p-1 rounded-lg border text-center transition ${bg} ${isSel}">
+                  <div>${item.num}</div>
+                  <div class="opacity-80">${item.finalScore.toFixed(0)}%</div>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } else if (state.mode === 'backtest') {
+        const bt = runHistoricalBacktest(cachedDraws, state.weights, 8, state.danSize);
+        panel.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+            <div>
+              <h3 class="font-bold text-sm text-white">✅ Kiểm Chứng Lịch Sử Trên Dữ Liệu Thật</h3>
+              <p class="text-xs text-slate-400">Đối chiếu công thức % hiện tại trên ${bt.daysTested} kỳ quay gần nhất</p>
+            </div>
+            <span class="px-2 py-1 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono text-xs">
+              Tỷ lệ nổ Dàn ${state.danSize}: <b>${bt.danWinRate}%</b>
+            </span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs font-mono">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400">
+                  <th class="py-1.5 px-2">Kỳ quay</th>
+                  <th class="py-1.5 px-2">ĐB Thực tế</th>
+                  <th class="py-1.5 px-2">Bạch Thủ AI</th>
+                  <th class="py-1.5 px-2">Song Thủ AI</th>
+                  <th class="py-1.5 px-2">Số nổ trong Dàn ${state.danSize}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60">
+                ${bt.history.map(row => `
+                  <tr>
+                    <td class="py-1.5 px-2 text-slate-300">${row.date}</td>
+                    <td class="py-1.5 px-2 text-rose-400 font-bold">${row.actualSpecial}</td>
+                    <td class="py-1.5 px-2 ${row.bachThuHit > 0 ? 'text-emerald-400 font-bold' : 'text-slate-400'}">${row.bachThuNum} ${row.bachThuHit > 0 ? `✓` : ''}</td>
+                    <td class="py-1.5 px-2 ${row.songThuHit > 0 ? 'text-emerald-400 font-bold' : 'text-slate-400'}">${row.songThuLabel} ${row.songThuHit > 0 ? `✓` : ''}</td>
+                    <td class="py-1.5 px-2">${row.danMatched.length > 0 ? `<span class="text-emerald-400 font-bold">Ăn ${row.danMatched.join(', ')}</span>` : `<span class="text-slate-500">-</span>`}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
+
+    function renderSelectedNumberCard() {
+      const card = document.getElementById('selected-number-card');
+      const item = cachedPredictions.byNumMap[state.selectedNum] || cachedPredictions.ranked[0];
+
+      card.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+          <div class="flex items-center gap-2.5">
+            <span class="px-3 py-1 rounded-xl bg-blue-600 text-white font-mono font-extrabold text-xl">${item.num}</span>
+            <div>
+              <div class="font-bold text-sm text-white">Chi Tiết 10 Thuật Toán Chấm Điểm Số ${item.num} (Hạng #${item.rank}/100)</div>
+              <div class="text-xs text-slate-400">
+                Cầu vị trí: <b class="text-slate-200">${item.bridgePos}</b> • Markov từ <b class="text-slate-200">${item.markovFrom}</b> • Gan <b class="text-slate-200">${item.daysAbsent}d</b> (Chu kỳ TB ${item.avgCycle}d)
+              </div>
+            </div>
+          </div>
+          <div class="text-right font-mono">
+            <span class="text-xs text-slate-400 block">Điểm hội tụ 100%:</span>
+            <span class="text-lg font-extrabold text-emerald-400">${item.finalScoreStr}%</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs font-mono">
+          ${item.breakdown.map(b => `
+            <div class="p-2 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-between space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-300 font-semibold truncate">${b.short.replace(/^[0-9]+\.\s*/, '')}</span>
+                <span class="text-slate-400">${b.weight}%</span>
+              </div>
+              <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div class="h-full" style="width:${b.rawScore}%; background:${b.color}"></div>
+              </div>
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">Gốc: ${b.rawScore}</span>
+                <span class="font-bold text-emerald-400">+${b.contrib.toFixed(2)}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderUI() {
+      renderAlgorithmsPanel();
+      renderModeContent();
+      renderSelectedNumberCard();
+    }
+
+    function copyConfigCode() {
+      const inp = document.getElementById('config-code-input');
+      navigator.clipboard?.writeText(inp.value);
+      const btn = document.getElementById('btn-copy-code');
+      btn.textContent = '✓ Đã sao chép!';
+      setTimeout(() => { btn.textContent = 'Sao chép mã'; }, 1800);
+    }
+
+    function promptImportCode() {
+      const code = prompt('Dán Mã đồng bộ cấu hình %:');
+      if (!code) return;
+      const match = code.trim().match(/^(XSMB|XSMN|XSMT)-(\d{4})(\d{2})(\d{2})-\[([0-9.]+)\]$/i);
+      if (!match) return alert('Mã không đúng định dạng!');
+      const reg = match[1].toLowerCase();
+      const parts = match[5].split('.').map(x => parseInt(x, 10) || 0);
+      if (parts.length !== ALGORITHMS.length) return alert('Số lượng thuật toán không khớp!');
+      ALGORITHMS.forEach((a, idx) => {
+        state.weights[a.id] = parts[idx];
+        state.locked[a.id] = false;
+      });
+      changeRegion(reg);
+    }
+
+    function copyDanNumbers() {
+      const text = document.getElementById('dan-copy-text')?.textContent?.trim();
+      if (text) {
+        navigator.clipboard?.writeText(text);
+        alert('Đã copy dàn số: ' + text);
+      }
+    }
+
+    function toggleCustomModal() {
+      const m = document.getElementById('custom-kq-modal');
+      m.classList.toggle('hidden');
+      if (!m.classList.contains('hidden') && cachedEvaluation) {
+        document.getElementById('inp-special').value = cachedEvaluation.latestDraw.specialPrize;
+        document.getElementById('inp-first').value = cachedEvaluation.latestDraw.firstPrize;
+      }
+    }
+
+    function applyCustomResult() {
+      const sp = document.getElementById('inp-special').value.trim();
+      const fp = document.getElementById('inp-first').value.trim();
+      const lotosRaw = document.getElementById('inp-lotos').value.trim();
+      const extraLotos = lotosRaw ? lotosRaw.split(/[\s,;]+/).map(x => parseInt(x, 10)).filter(x => !isNaN(x)) : [];
+      state.customOverride = { specialPrize: sp, firstPrize: fp, extraLotos };
+      toggleCustomModal();
+      cachedDraws = buildHistoricalDraws(state.region, state.dateStr, state.customOverride);
+      state.sourceName = 'KQXS người dùng nhập trực tiếp';
+      cachedEvaluation = evaluateAllNumbers(cachedDraws);
+      recomputeScoresOnly();
+    }
+
+    function resetCustomResult() {
+      state.customOverride = null;
+      toggleCustomModal();
+      syncFromInternet();
+    }
+
+    // Automatically fetch real lottery results from the Internet on startup!
+    syncFromInternet();
+  </script>
+</body>
+</html>

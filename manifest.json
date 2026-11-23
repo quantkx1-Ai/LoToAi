@@ -1,0 +1,18 @@
+{
+  "name": "LotoAI Pro - Thống Kê & Phân Tích Xác Suất Xổ Số",
+  "short_name": "LotoAI Pro",
+  "description": "Ứng dụng tra cứu kết quả xổ số và phân tích thống kê tất định 10 thuật toán toán học",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
