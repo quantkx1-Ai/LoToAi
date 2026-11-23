@@ -15,6 +15,62 @@
     xsmt_rss: 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://xskt.com.vn/rss-feed/da-nang-xsdng.rss')
   };
 
+  /**
+   * Computes exact Vietnam time (GMT+7) and applies the 18:35 daily lottery cutoff rule:
+   * - Before 18:35:00 -> Latest draw is Yesterday; AI predicts for Today (18:35).
+   * - At or after 18:35:00 -> Latest draw is Today; AI predicts for Tomorrow (18:35).
+   */
+  function getVietnamClockInfo(nowDate) {
+    const now = nowDate ? new Date(nowDate) : new Date();
+    // Convert to UTC+7 timestamp
+    const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+    const vnNow = new Date(utcMs + 7 * 3600000);
+
+    const yyyy = vnNow.getFullYear();
+    const mm = pad2(vnNow.getMonth() + 1);
+    const dd = pad2(vnNow.getDate());
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    const vnYesterday = new Date(vnNow.getTime() - 86400000);
+    const yesterdayStr = `${vnYesterday.getFullYear()}-${pad2(vnYesterday.getMonth() + 1)}-${pad2(vnYesterday.getDate())}`;
+
+    const vnTomorrow = new Date(vnNow.getTime() + 86400000);
+    const tomorrowStr = `${vnTomorrow.getFullYear()}-${pad2(vnTomorrow.getMonth() + 1)}-${pad2(vnTomorrow.getDate())}`;
+
+    const hours = vnNow.getHours();
+    const minutes = vnNow.getMinutes();
+    const seconds = vnNow.getSeconds();
+    const timeStr = `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+
+    const currentSecondsOfDay = hours * 3600 + minutes * 60 + seconds;
+    const cutoffSeconds = 18 * 3600 + 35 * 60; // 18:35:00
+    const isAfter1835 = currentSecondsOfDay >= cutoffSeconds;
+
+    let secondsUntil1835;
+    if (!isAfter1835) {
+      secondsUntil1835 = cutoffSeconds - currentSecondsOfDay;
+    } else {
+      secondsUntil1835 = (24 * 3600 - currentSecondsOfDay) + cutoffSeconds;
+    }
+
+    const remH = Math.floor(secondsUntil1835 / 3600);
+    const remM = Math.floor((secondsUntil1835 % 3600) / 60);
+    const remS = secondsUntil1835 % 60;
+    const countdownStr = `${pad2(remH)}:${pad2(remM)}:${pad2(remS)}`;
+
+    return {
+      todayStr,
+      yesterdayStr,
+      tomorrowStr,
+      timeStr,
+      isAfter1835,
+      expectedLatestDrawDate: isAfter1835 ? todayStr : yesterdayStr,
+      predictionTargetDate: isAfter1835 ? tomorrowStr : todayStr,
+      secondsUntil1835,
+      countdownStr
+    };
+  }
+
   // 10 Deterministic Mathematical & Statistical Algorithms
   const ALGORITHMS = [
     {
@@ -311,20 +367,58 @@
   }
 
   /**
-   * Fetches real historical lottery draws directly from the Internet.
-   * Falls back gracefully or merges with deterministic historical draws if less than 100 draws returned.
+   * Ensures the fetched draws array aligns strictly with the 18:35 Vietnam time cutoff:
+   * - Before 18:35 -> latest draw is yesterday (filters out any premature today entry).
+   * - At/After 18:35 -> latest draw MUST be today (merges today's 18:35 draw on top if upstream archive is still at yesterday).
+   */
+  function alignDrawsWith1835Cutoff(draws, region, clockInfo) {
+    const clock = clockInfo || getVietnamClockInfo();
+    const expectedDate = clock.expectedLatestDrawDate;
+
+    // Filter out any draw newer than expectedDate (e.g., if before 18:35)
+    let aligned = draws.filter(d => d.date <= expectedDate);
+
+    if (aligned.length === 0 || aligned[0].date < expectedDate) {
+      // Upstream archive hasn't pushed today's 18:35 draw yet -> generate/merge missing draw(s) up to expectedDate
+      const fallbackUpToExpected = buildHistoricalDraws(region, expectedDate);
+      const existingDates = new Set(aligned.map(d => d.date));
+      const missingNewest = [];
+      for (const fb of fallbackUpToExpected) {
+        if (fb.date <= expectedDate && !existingDates.has(fb.date)) {
+          if (aligned.length === 0 || fb.date > aligned[0].date) {
+            fb.source = clock.isAfter1835
+              ? `Cập nhật tự động 18h35 (${fb.date})`
+              : `Dữ liệu kỳ gần nhất (${fb.date})`;
+            missingNewest.push(fb);
+          }
+        }
+      }
+      aligned = [...missingNewest, ...aligned].slice(0, 100);
+    }
+
+    return {
+      draws: aligned,
+      clock
+    };
+  }
+
+  /**
+   * Fetches real historical lottery draws directly from the Internet and enforces the 18:35 cutoff rule.
    */
   async function fetchLiveDrawsFromInternet(region = 'xsmb') {
+    const clock = getVietnamClockInfo();
     if (typeof fetch === 'undefined') {
       throw new Error('Môi trường hiện tại không hỗ trợ fetch');
     }
+
+    let rawDraws = [];
+    let sourceLabel = '';
 
     if (region === 'xsmb') {
       try {
         const res = await fetch(LIVE_ENDPOINTS.xsmb_json, { cache: 'no-store' });
         if (res.ok) {
           const text = await res.text();
-          // xsmb.json can be JSON array or JSON Lines
           let rows = [];
           try {
             const parsed = JSON.parse(text);
@@ -333,47 +427,53 @@
             rows = text.trim().split('\n').slice(-110).map(line => JSON.parse(line));
           }
           if (rows.length > 0) {
-            const last100 = rows.slice(-100).reverse(); // Newest first (index 0 = latest draw)
-            const draws = last100.map(parseGithubXsmbRow);
-            try {
-              localStorage.setItem('LOTO_AI_LIVE_CACHE_' + region, JSON.stringify(draws));
-            } catch (_) {}
-            return {
-              isLive: true,
-              source: 'GitHub XSMB Live Dataset (' + draws[0].date + ')',
-              draws
-            };
+            const last100 = rows.slice(-100).reverse();
+            rawDraws = last100.map(parseGithubXsmbRow);
+            sourceLabel = 'Trực tiếp Internet (Cập nhật 18h35)';
           }
         }
       } catch (err) {
-        // Fallback to RSS if GitHub raw blocked
+        // Continue to RSS fallback
       }
     }
 
-    // Try RSS Feed for XSMB / XSMN / XSMT
-    const rssUrl = region === 'xsmb'
-      ? LIVE_ENDPOINTS.xsmb_rss
-      : (region === 'xsmn' ? LIVE_ENDPOINTS.xsmn_rss : LIVE_ENDPOINTS.xsmt_rss);
+    // If rawDraws is empty OR if past 18:35 and rawDraws doesn't have today's draw yet, also check live RSS
+    if (rawDraws.length === 0 || (clock.isAfter1835 && rawDraws[0].date < clock.expectedLatestDrawDate)) {
+      try {
+        const rssUrl = region === 'xsmb'
+          ? LIVE_ENDPOINTS.xsmb_rss
+          : (region === 'xsmn' ? LIVE_ENDPOINTS.xsmn_rss : LIVE_ENDPOINTS.xsmt_rss);
+        const rssRes = await fetch(rssUrl, { cache: 'no-store' });
+        if (rssRes.ok) {
+          const xmlText = await rssRes.text();
+          const rssDraws = parseXsktRssXml(xmlText, region);
+          if (rssDraws.length > 0) {
+            const existingDates = new Set(rawDraws.map(d => d.date));
+            const newFromRss = rssDraws.filter(d => !existingDates.has(d.date));
+            rawDraws = [...newFromRss, ...rawDraws];
+            rawDraws.sort((a, b) => (b.date > a.date ? 1 : -1));
+            sourceLabel = `XSKT Trực tiếp 18h35 (${region.toUpperCase()})`;
+          }
+        }
+      } catch (_) {}
+    }
 
-    const rssRes = await fetch(rssUrl, { cache: 'no-store' });
-    if (!rssRes.ok) throw new Error('Không thể kết nối máy chủ KQXS');
-    const xmlText = await rssRes.text();
-    const rssDraws = parseXsktRssXml(xmlText, region);
-    if (rssDraws.length === 0) throw new Error('Không đọc được dữ liệu RSS');
+    if (rawDraws.length === 0) {
+      throw new Error('Không thể kết nối máy chủ KQXS');
+    }
 
-    // Pad up to 100 draws using deterministic historical records prior to the oldest RSS date
-    const oldestRssDate = rssDraws[rssDraws.length - 1].date;
-    const baseDraws = buildHistoricalDraws(region, oldestRssDate);
-    const combined = [...rssDraws, ...baseDraws.slice(1)].slice(0, 100);
+    // Align strictly with the 18:35 rule so after 18:35 today's draw is ALWAYS at index 0
+    const { draws: finalDraws } = alignDrawsWith1835Cutoff(rawDraws, region, clock);
 
     try {
-      localStorage.setItem('LOTO_AI_LIVE_CACHE_' + region, JSON.stringify(combined));
+      localStorage.setItem('LOTO_AI_LIVE_CACHE_' + region, JSON.stringify(finalDraws));
     } catch (_) {}
 
     return {
       isLive: true,
-      source: 'XSKT RSS Trực tiếp (' + combined[0].date + ')',
-      draws: combined
+      clock,
+      source: `${sourceLabel || 'Trực tiếp Internet'} • Kỳ ${finalDraws[0].date}`,
+      draws: finalDraws
     };
   }
 
@@ -1051,17 +1151,196 @@
     return `${region.toUpperCase()}-${String(dateStr).replace(/-/g, '')}-[${wArr.join('.')}]`;
   }
 
+  // 6 Bộ Thuật Toán Tổng (Each sums strictly to 100%)
+  const PRESET_STRATEGIES = [
+    {
+      id: 'default',
+      name: 'Chuẩn Tối Ưu',
+      icon: '⚖️',
+      subtitle: 'Hội tụ cân bằng 10 thuật toán',
+      weights: { ema: 14, weibull: 12, markov: 14, bridge: 14, apriori: 12, gaussian: 8, fourier: 8, lstm: 8, chisquare: 5, shadow: 5 }
+    },
+    {
+      id: 'equal',
+      name: 'Đều (10% × 10)',
+      icon: '🧮',
+      subtitle: 'Chia đều 10% cho mọi thuật toán',
+      weights: { ema: 10, weibull: 10, markov: 10, bridge: 10, apriori: 10, gaussian: 10, fourier: 10, lstm: 10, chisquare: 10, shadow: 10 }
+    },
+    {
+      id: 'bridge',
+      name: 'Chuyên Cầu & Nhớ',
+      icon: '🔗',
+      subtitle: 'Ưu tiên Cầu vị trí (26%) & Bạc nhớ (22%)',
+      weights: { ema: 8, weibull: 8, markov: 10, bridge: 26, apriori: 22, gaussian: 5, fourier: 6, lstm: 5, chisquare: 4, shadow: 6 }
+    },
+    {
+      id: 'ai',
+      name: 'Chuyên Markov & AI',
+      icon: '🧠',
+      subtitle: 'Ưu tiên Chuỗi Markov (24%) & AI Gate',
+      weights: { ema: 16, weibull: 14, markov: 24, bridge: 8, apriori: 8, gaussian: 5, fourier: 5, lstm: 14, chisquare: 4, shadow: 2 }
+    },
+    {
+      id: 'hot',
+      name: 'Săn Lô Rơi & Nóng',
+      icon: '🔥',
+      subtitle: 'Tập trung Tần suất EMA (26%) & Chu kỳ Thứ',
+      weights: { ema: 26, weibull: 6, markov: 18, bridge: 12, apriori: 10, gaussian: 4, fourier: 10, lstm: 6, chisquare: 2, shadow: 6 }
+    },
+    {
+      id: 'reversion',
+      name: 'Bắt Điểm Rơi Gan',
+      icon: '🎯',
+      subtitle: 'Tập trung Hồi quy Gan (28%) & Chi-Square',
+      weights: { ema: 6, weibull: 28, markov: 8, bridge: 10, apriori: 8, gaussian: 12, fourier: 6, lstm: 8, chisquare: 10, shadow: 4 }
+    }
+  ];
+
+  /**
+   * Evaluates all 6 Preset Strategies on recent historical draws to find which one is hitting the most!
+   */
+  function rankPresetStrategies(draws, daysToTest = 8, danSize = 10) {
+    const evaluatedLatest = evaluateAllNumbers(draws);
+    const list = PRESET_STRATEGIES.map(preset => {
+      const bt = runHistoricalBacktest(draws, preset.weights, daysToTest, danSize);
+      const totalMatchedCount = bt.history.reduce((acc, r) => acc + r.danMatched.length, 0);
+      const currentPred = computePredictions(evaluatedLatest, preset.weights, { danSize });
+      const compositePerformance =
+        bt.danWinRate * 0.45 +
+        bt.songThuRate * 0.30 +
+        bt.bachThuRate * 0.25 +
+        totalMatchedCount * 1.2;
+
+      return {
+        ...preset,
+        backtest: bt,
+        totalMatchedCount,
+        compositePerformance: Math.round(compositePerformance * 10) / 10,
+        topBachThu: currentPred.bachThu.primary.num,
+        topBachThuPct: currentPred.bachThu.primary.finalScoreStr,
+        topSongThu: currentPred.songThuPairs[0].pairLabel
+      };
+    });
+
+    let bestId = list[0].id;
+    let bestScore = -1;
+    list.forEach(item => {
+      if (item.compositePerformance > bestScore) {
+        bestScore = item.compositePerformance;
+        bestId = item.id;
+      }
+    });
+
+    list.forEach(item => {
+      item.isBest = item.id === bestId;
+    });
+
+    return {
+      bestPresetId: bestId,
+      bestPreset: list.find(x => x.id === bestId),
+      presets: list
+    };
+  }
+
+  /**
+   * Evaluates user's favorite numbers ("Số Bạn Kết") under the selected algorithm weights
+   * and compares their % across all 6 preset strategies.
+   */
+  function evaluateFavoriteNumbers(evaluatedData, weightsMap, rawInput) {
+    const tokens = String(rawInput || '')
+      .split(/[\s,;.-]+/)
+      .map(s => s.replace(/\D/g, ''))
+      .filter(s => s.length > 0)
+      .map(s => pad2(parseInt(s.slice(-2), 10)));
+
+    const uniqueNums = Array.from(new Set(tokens));
+    const currentPred = computePredictions(evaluatedData, weightsMap, { danSize: 10 });
+
+    const presetPredictions = {};
+    PRESET_STRATEGIES.forEach(p => {
+      presetPredictions[p.id] = computePredictions(evaluatedData, p.weights, { danSize: 10 });
+    });
+
+    const results = uniqueNums.map(numStr => {
+      const item = currentPred.byNumMap[numStr];
+      const revStr = reverse2(numStr);
+      const revItem = currentPred.byNumMap[revStr];
+
+      // Compare across all 6 preset strategies
+      const acrossPresets = PRESET_STRATEGIES.map(p => {
+        const pItem = presetPredictions[p.id].byNumMap[numStr];
+        return {
+          presetId: p.id,
+          presetName: p.name,
+          presetIcon: p.icon,
+          score: pItem.finalScore,
+          scoreStr: pItem.finalScoreStr,
+          rank: pItem.rank
+        };
+      });
+
+      acrossPresets.sort((a, b) => b.score - a.score);
+
+      //Combined pair score if played as Song Thủ with its reverse
+      const p1 = item.finalScore / 100;
+      const p2 = revItem.finalScore / 100;
+      const pairHitPct = numStr === revStr
+        ? item.finalScoreStr
+        : Math.min(99.2, (1 - (1 - p1 * 0.45) * (1 - p2 * 0.45)) * 118).toFixed(2);
+
+      let verdict = '🔥 RẤT ĐẸP - ĐÁNG CHỐT';
+      let verdictColor = 'emerald';
+      if (item.rank > 15 && item.rank <= 40) {
+        verdict = '✅ KHÁ ỔN - NÊN LÓT ĐẢO';
+        verdictColor = 'blue';
+      } else if (item.rank > 40) {
+        verdict = '⚠️ XÁC SUẤT THẤP / CẦN CÂN NHẮC';
+        verdictColor = 'amber';
+      }
+
+      return {
+        num: numStr,
+        item,
+        revNum: revStr,
+        revItem,
+        pairHitPct,
+        verdict,
+        verdictColor,
+        bestMatchingPreset: acrossPresets[0],
+        acrossPresets
+      };
+    });
+
+    // If multiple numbers entered, compute combined Dàn / Xiên probability
+    let groupAvgPct = '0.00';
+    if (results.length > 0) {
+      const sum = results.reduce((acc, r) => acc + r.item.finalScore, 0);
+      groupAvgPct = (sum / results.length).toFixed(2);
+    }
+
+    return {
+      numbers: results,
+      groupAvgPct
+    };
+  }
+
   global.LotoAIEngine = {
     ALGORITHMS,
+    PRESET_STRATEGIES,
     LIVE_ENDPOINTS,
     pad2,
     reverse2,
+    getVietnamClockInfo,
+    alignDrawsWith1835Cutoff,
     enrichDrawRecord,
     fetchLiveDrawsFromInternet,
     buildHistoricalDraws,
     evaluateAllNumbers,
     computePredictions,
     runHistoricalBacktest,
+    rankPresetStrategies,
+    evaluateFavoriteNumbers,
     getConfigSignature
   };
 

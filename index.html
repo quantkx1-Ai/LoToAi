@@ -13,83 +13,119 @@
   <script>if (!window.LotoAIEngine) document.write('<script src="./js/engine.js"><\/script>');</script>
   <style>
     body {
-      background-color: #0b1120;
+      background-color: #070b14;
       color: #f1f5f9;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #0f172a; }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+
+    .preset-card {
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .preset-card:hover {
+      transform: translateY(-4px) scale(1.015);
+    }
+    .preset-card-active {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 12px 28px -6px rgba(37, 99, 235, 0.55), 0 0 0 2px #3b82f6;
+    }
+    .preset-card-best {
+      box-shadow: 0 12px 30px -5px rgba(16, 185, 129, 0.45), 0 0 0 2px #10b981;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45), 0 10px 25px -5px rgba(16, 185, 129, 0.35); }
+      50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0), 0 14px 30px -4px rgba(16, 185, 129, 0.55); }
+    }
+    .best-glow {
+      animation: pulseGlow 2.4s infinite;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between">
   <!-- App Top Bar -->
   <header class="sticky top-0 z-30 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-3 py-2.5">
-    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2.5">
-        <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center font-extrabold text-sm shadow-lg shadow-blue-600/30">AI</div>
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 flex items-center justify-center font-extrabold text-base shadow-lg shadow-blue-600/30">AI</div>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="font-bold text-sm sm:text-base tracking-tight">LotoAI Pro</h1>
-            <span id="live-status-pill" class="px-2 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono">
-              🌐 Đang tải KQXS từ Internet...
+            <h1 class="font-extrabold text-base sm:text-lg tracking-tight">LotoAI Pro</h1>
+            <span id="live-status-pill" class="px-2.5 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono">
+              🌐 Đang tải KQXS 18h35...
             </span>
           </div>
-          <p class="text-xs text-slate-400">Xem KQXS trực tiếp 27 giải • 10 thuật toán tất định 100% (Không Random)</p>
+          <p class="text-xs text-slate-400">Tự động cập nhật KQXS đúng 18h35 • 6 Bộ Thuật Toán Tổng & 10 Thuật Toán Chi Tiết</p>
         </div>
       </div>
 
-      <!-- Region & Live Internet Sync Controls -->
-      <div class="flex flex-wrap items-center gap-1.5 text-xs">
-        <div class="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700">
-          <button onclick="changeRegion('xsmb')" id="reg-xsmb" class="px-2.5 py-1 rounded-md font-semibold bg-blue-600 text-white transition">Miền Bắc</button>
-          <button onclick="changeRegion('xsmn')" id="reg-xsmn" class="px-2.5 py-1 rounded-md font-medium text-slate-300 hover:text-white transition">Miền Nam</button>
-          <button onclick="changeRegion('xsmt')" id="reg-xsmt" class="px-2.5 py-1 rounded-md font-medium text-slate-300 hover:text-white transition">Miền Trung</button>
+      <!-- Region, Live Sync & SỐ BẠN KẾT Button -->
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <div class="inline-flex rounded-xl bg-slate-800 p-1 border border-slate-700">
+          <button onclick="changeRegion('xsmb')" id="reg-xsmb" class="px-3 py-1.5 rounded-lg font-bold bg-blue-600 text-white transition">Miền Bắc</button>
+          <button onclick="changeRegion('xsmn')" id="reg-xsmn" class="px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition">Miền Nam</button>
+          <button onclick="changeRegion('xsmt')" id="reg-xsmt" class="px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition">Miền Trung</button>
         </div>
-        <button onclick="syncFromInternet()" id="btn-sync-net" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition flex items-center gap-1">
-          <span>🔄 Tải KQXS Internet</span>
+        <button onclick="syncFromInternet()" id="btn-sync-net" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 font-semibold transition flex items-center gap-1">
+          <span>🔄 Tải KQXS 18h35</span>
         </button>
-        <button onclick="toggleCustomModal()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-400 font-medium transition">
-          ✏️ Nhập Tay
+        <!-- Replaced "Nhập Tay" with prominent "❤️ Số Bạn Kết" button -->
+        <button onclick="openFavoriteMode()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold shadow-lg shadow-rose-600/35 transition transform hover:-translate-y-0.5 flex items-center gap-1.5 text-xs sm:text-sm">
+          <span>❤️ Số Bạn Kết (Tính % Nổ)</span>
         </button>
       </div>
     </div>
   </header>
 
   <!-- Main Content Grid -->
-  <main class="max-w-6xl w-full mx-auto flex-1 p-3 grid grid-cols-1 lg:grid-cols-12 gap-4">
+  <main class="max-w-7xl w-full mx-auto flex-1 p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
     
-    <!-- Left Column: 10-Algorithm 100% Weight Splitter (5 cols) -->
-    <section class="lg:col-span-5 flex flex-col gap-3">
-      <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-xl">
+    <!-- Left Column: 6 Bộ Thuật Toán Tổng (Nổi Bật, To Hơn) + 10 Thanh Trượt Tự Động Khóa (5 cols) -->
+    <section class="lg:col-span-5 flex flex-col gap-3.5">
+      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3.5 shadow-2xl">
+        
+        <!-- Section Header -->
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="font-bold text-sm flex items-center gap-1.5">
-              <span>⚖️ Chia Tỷ Trọng 10 Thuật Toán</span>
+            <h2 class="font-extrabold text-base text-white flex items-center gap-2">
+              <span>🚀 6 Bộ Thuật Toán Tổng</span>
             </h2>
-            <p class="text-xs text-slate-400">Cùng tỷ trọng % + cùng kỳ KQXS ⇒ Kết quả giống nhau 100%</p>
+            <p class="text-xs text-slate-400">Chạm chọn 1 bộ thuật toán ⇒ Tự động khóa 10 thanh tỷ trọng bên dưới</p>
           </div>
-          <span id="total-pct-badge" class="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-mono font-bold text-xs">Tổng: 100%</span>
+          <span id="total-pct-badge" class="px-3 py-1 rounded-xl bg-blue-600 text-white font-mono font-extrabold text-xs shadow">Tổng: 100%</span>
+        </div>
+
+        <!-- AI Suggestion Banner highlighting the Best Winning Algorithm Preset -->
+        <div id="best-preset-suggestion-banner" class="p-3 rounded-xl bg-gradient-to-r from-emerald-950/90 via-teal-950/80 to-slate-900 border-2 border-emerald-500/70 text-xs space-y-1">
+          <!-- Populated dynamically by JS -->
+        </div>
+
+        <!-- 6 Large, Elevated 3D Preset Strategy Cards (2 cols x 3 rows) -->
+        <div id="preset-cards-grid" class="grid grid-cols-2 gap-2.5">
+          <!-- Populated dynamically by JS -->
         </div>
 
         <!-- 100% Stacked Bar -->
-        <div id="weight-stacked-bar" class="w-full h-3.5 rounded-full overflow-hidden flex bg-slate-800 border border-slate-700"></div>
-
-        <!-- Quick Presets -->
-        <div class="grid grid-cols-4 gap-1.5 text-xs">
-          <button onclick="setPreset('default')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium transition">Chuẩn Tối Ưu</button>
-          <button onclick="setPreset('equal')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium transition">Đều (10%×10)</button>
-          <button onclick="setPreset('bridge')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium transition">Chuyên Cầu/Nhớ</button>
-          <button onclick="setPreset('ai')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium transition">Chuyên Markov/AI</button>
+        <div class="space-y-1 pt-1">
+          <div class="flex items-center justify-between text-xs">
+            <span id="lock-status-label" class="font-semibold text-amber-400 flex items-center gap-1">
+              🔒 Đang khóa thanh trượt theo Bộ Thuật Toán
+            </span>
+            <button onclick="toggleUnlockAllSliders()" id="btn-unlock-all" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-400 font-semibold transition">
+              🔓 Mở khóa tự chỉnh %
+            </button>
+          </div>
+          <div id="weight-stacked-bar" class="w-full h-3.5 rounded-full overflow-hidden flex bg-slate-800 border border-slate-700"></div>
         </div>
 
         <!-- 10 Sliders List -->
-        <div id="algorithms-list" class="space-y-2 max-h-[420px] overflow-y-auto pr-1"></div>
+        <div id="algorithms-list" class="space-y-2 max-h-[340px] overflow-y-auto pr-1"></div>
 
         <!-- Deterministic Config Signature Box -->
         <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1.5">
           <div class="flex items-center justify-between">
-            <span class="text-slate-400 font-medium">🔑 Mã đồng bộ % (Đảm bảo mọi máy ra cùng KQ):</span>
+            <span class="text-slate-400 font-medium">🔑 Mã đồng bộ % (Cùng mã ⇒ Cùng KQ 100%):</span>
             <button onclick="copyConfigCode()" id="btn-copy-code" class="text-blue-400 hover:underline font-medium">Sao chép mã</button>
           </div>
           <div class="flex gap-1.5">
@@ -100,45 +136,84 @@
       </div>
     </section>
 
-    <!-- Right Column: Lottery Result Board & Multi-Mode Soi Cầu (7 cols) -->
-    <section class="lg:col-span-7 flex flex-col gap-3">
+    <!-- Right Column: Quick "Số Bạn Kết" Bar + Lottery Result Board & Multi-Mode Soi Cầu (7 cols) -->
+    <section class="lg:col-span-7 flex flex-col gap-3.5">
       
-      <!-- Today's Base Result Banner -->
-      <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div class="flex items-center gap-3">
-          <div>
-            <span class="text-slate-400 block">Kỳ KQXS mới nhất:</span>
-            <span id="base-draw-label" class="font-bold text-slate-200 font-mono">Đang tải...</span>
+      <!-- Today's Base Result Banner + 18:35 Auto-Schedule Status -->
+      <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 text-xs shadow-lg">
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-400 border border-blue-500/30 font-mono font-bold" id="vn-clock-badge">🕒 --:--:-- (GMT+7)</span>
+            <span id="schedule-1835-status" class="font-semibold text-emerald-400">Đúng 18h35 tự động cập nhật KQXS hôm nay</span>
           </div>
-          <div class="h-7 w-px bg-slate-800"></div>
-          <div>
-            <span class="text-slate-400 block">Giải Đặc Biệt:</span>
-            <span id="base-special-prize" class="font-mono font-bold text-base text-rose-400 tracking-wider">-----</span>
-          </div>
-          <div>
-            <span class="text-slate-400 block">Giải Nhất:</span>
-            <span id="base-first-prize" class="font-mono font-bold text-sm text-amber-400">-----</span>
-          </div>
+          <span id="next-1835-countdown" class="font-mono text-slate-400">Kỳ quay tiếp: --:--:--</span>
         </div>
-        <div class="text-right">
-          <span class="text-slate-400 block">Nguồn dữ liệu:</span>
-          <span id="data-source-label" class="font-semibold text-emerald-400">Trực tiếp Internet</span>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-3">
+            <div>
+              <span class="text-slate-400 block">Kỳ KQXS đã cập nhật (18h35):</span>
+              <span id="base-draw-label" class="font-bold text-slate-200 font-mono text-sm">Đang tải...</span>
+            </div>
+            <div class="h-8 w-px bg-slate-800"></div>
+            <div>
+              <span class="text-slate-400 block">Giải Đặc Biệt:</span>
+              <span id="base-special-prize" class="font-mono font-extrabold text-lg text-rose-400 tracking-wider">-----</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block">Giải Nhất:</span>
+              <span id="base-first-prize" class="font-mono font-bold text-base text-amber-400">-----</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-slate-400 block">Thuật toán đang chọn:</span>
+            <span id="active-preset-banner-name" class="font-extrabold text-sm text-blue-400">Chuẩn Tối Ưu</span>
+            <span id="target-predict-date" class="block font-mono text-xs text-emerald-400">Soi kỳ kế tiếp (18h35)</span>
+          </div>
         </div>
       </div>
 
-      <!-- Mode Navigation Tabs (7 Tabs including Bảng Kết Quả Xổ Số!) -->
-      <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 text-xs">
-        <button onclick="setMode('ketqua')" id="mode-ketqua" class="py-2 px-1.5 rounded-xl font-semibold bg-blue-600 text-white transition text-center">📋 Xem KQXS</button>
-        <button onclick="setMode('bachthu')" id="mode-bachthu" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">🎯 Bạch Thủ</button>
-        <button onclick="setMode('songthu')" id="mode-songthu" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">⚖️ Song Thủ</button>
-        <button onclick="setMode('danso')" id="mode-danso" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">🔢 Dàn N Số</button>
-        <button onclick="setMode('xien')" id="mode-xien" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">🔗 Xiên/Chạm</button>
-        <button onclick="setMode('matrix100')" id="mode-matrix100" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">📊 100 Số</button>
-        <button onclick="setMode('backtest')" id="mode-backtest" class="py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center">✅ Kiểm Chứng</button>
+      <!-- Always-Accessible Quick Bar: "❤️ SỐ BẠN KẾT - NHẬP SỐ TÍNH % NỔ NGAY" -->
+      <div class="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/70 via-slate-900 to-indigo-950/60 border-2 border-rose-500/60 shadow-xl space-y-2">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-extrabold text-xs">❤️ SỐ BẠN KẾT</span>
+            <span class="text-xs sm:text-sm font-bold text-white">Nhập con số bạn đang kết để tính % xác suất nổ theo thuật toán đã chọn:</span>
+          </div>
+          <span id="fav-active-alg-badge" class="text-xs font-mono text-rose-300">Theo: Chuẩn Tối Ưu</span>
+        </div>
+        <div class="flex flex-wrap sm:flex-nowrap gap-2">
+          <input
+            id="fav-number-input"
+            type="text"
+            value="68"
+            placeholder="Nhập 1 hoặc nhiều số bạn kết (VD: 68 hoặc 68, 86, 34)..."
+            onkeydown="if(event.key==='Enter') calculateFavoriteNumber()"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border-2 border-rose-500/50 focus:border-rose-400 text-white font-mono font-bold text-base placeholder:text-slate-500 outline-none"
+          />
+          <button
+            onclick="calculateFavoriteNumber()"
+            class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-sm whitespace-nowrap shadow-lg shadow-rose-600/30 transition transform hover:-translate-y-0.5"
+          >
+            ⚡ Tính % Nổ Ngay
+          </button>
+        </div>
+      </div>
+
+      <!-- Mode Navigation Tabs (Prominent Kiểm Chứng & Số Bạn Kết!) -->
+      <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5 bg-slate-900 p-2 rounded-2xl border border-slate-800 text-xs sm:text-sm">
+        <button onclick="setMode('ketqua')" id="mode-ketqua" class="py-2.5 px-2 rounded-xl font-bold bg-blue-600 text-white transition text-center">📋 Xem KQXS</button>
+        <button onclick="setMode('sobanket')" id="mode-sobanket" class="py-2.5 px-2 rounded-xl font-bold text-rose-300 bg-rose-950/40 border border-rose-500/40 hover:bg-rose-900/50 transition text-center">❤️ Số Bạn Kết</button>
+        <button onclick="setMode('bachthu')" id="mode-bachthu" class="py-2.5 px-2 rounded-xl font-semibold text-slate-300 hover:bg-slate-800 transition text-center">🎯 Bạch Thủ</button>
+        <button onclick="setMode('songthu')" id="mode-songthu" class="py-2.5 px-2 rounded-xl font-semibold text-slate-300 hover:bg-slate-800 transition text-center">⚖️ Song Thủ</button>
+        <button onclick="setMode('danso')" id="mode-danso" class="py-2.5 px-2 rounded-xl font-semibold text-slate-300 hover:bg-slate-800 transition text-center">🔢 Dàn N Số</button>
+        <button onclick="setMode('xien')" id="mode-xien" class="py-2.5 px-2 rounded-xl font-semibold text-slate-300 hover:bg-slate-800 transition text-center">🔗 Xiên/Chạm</button>
+        <button onclick="setMode('backtest')" id="mode-backtest" class="py-2.5 px-2 rounded-xl font-extrabold text-emerald-300 bg-emerald-950/50 border-2 border-emerald-500/60 hover:bg-emerald-900/60 transition text-center shadow-md shadow-emerald-500/20">
+          ✅ Kiểm Chứng
+        </button>
       </div>
 
       <!-- Dynamic Mode Content Panel -->
-      <div id="mode-content-panel" class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-xl min-h-[340px]">
+      <div id="mode-content-panel" class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-2xl min-h-[360px]">
         <!-- Rendered by JS -->
       </div>
 
@@ -150,85 +225,106 @@
     </section>
   </main>
 
-  <!-- Store Compliance Footer (Bắt buộc khi duyệt CH Play & App Store) -->
-  <footer class="max-w-6xl w-full mx-auto px-3 py-3 border-t border-slate-800/80 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
+  <!-- Store Compliance Footer -->
+  <footer class="max-w-7xl w-full mx-auto px-4 py-3 border-t border-slate-800/80 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
     <div>
       🛡️ <b>Tuyên bố tuân thủ:</b> Ứng dụng chỉ phục vụ tra cứu kết quả Xổ số kiến thiết và phân tích thống kê toán học. Tuyệt đối không tổ chức cá cược hay giao dịch tiền thật (18+).
     </div>
     <a href="./privacy-policy.html" class="text-blue-400 hover:underline font-medium">📜 Chính sách bảo mật & Điều khoản</a>
   </footer>
 
-  <!-- Modal Nhập KQXS Thực Tế -->
-  <div id="custom-kq-modal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-4 space-y-3 text-xs">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
-        <h3 class="font-bold text-sm">✏️ Nhập Kết Quả Xổ Số Kỳ Hiện Tại</h3>
-        <button onclick="toggleCustomModal()" class="text-slate-400 hover:text-white">✕</button>
-      </div>
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <label class="block text-slate-300 mb-1">Giải Đặc Biệt (5 số):</label>
-          <input id="inp-special" type="text" maxlength="6" placeholder="VD: 48291" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 font-mono text-sm" />
-        </div>
-        <div>
-          <label class="block text-slate-300 mb-1">Giải Nhất (5 số):</label>
-          <input id="inp-first" type="text" maxlength="5" placeholder="VD: 73604" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 font-mono text-sm" />
-        </div>
-      </div>
-      <div>
-        <label class="block text-slate-300 mb-1">Các số Loto 2 số cuối khác đã về:</label>
-        <textarea id="inp-lotos" rows="2" placeholder="VD: 15, 27, 39, 68" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 font-mono text-xs"></textarea>
-      </div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button onclick="resetCustomResult()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">Khôi phục</button>
-        <button onclick="applyCustomResult()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold">Áp dụng & Tính Toán</button>
-      </div>
-    </div>
-  </div>
-
   <script>
     const {
       ALGORITHMS,
+      PRESET_STRATEGIES,
       pad2,
       reverse2,
+      getVietnamClockInfo,
+      alignDrawsWith1835Cutoff,
       fetchLiveDrawsFromInternet,
       buildHistoricalDraws,
       evaluateAllNumbers,
       computePredictions,
       runHistoricalBacktest,
+      rankPresetStrategies,
+      evaluateFavoriteNumbers,
       getConfigSignature
     } = window.LotoAIEngine;
 
+    const initClock = getVietnamClockInfo();
+
     let state = {
       region: 'xsmb',
-      dateStr: new Date().toISOString().slice(0, 10),
-      mode: 'ketqua', // Starts on 📋 Xem KQXS so user immediately sees the full lottery results board!
-      viewingDrawIdx: 0, // 0 = latest draw, 1 = yesterday, ... up to 99
+      dateStr: initClock.expectedLatestDrawDate,
+      predictForDate: initClock.predictionTargetDate,
+      wasAfter1835: initClock.isAfter1835,
+      mode: 'ketqua',
+      activePresetId: 'default',
+      favoriteInput: '68',
+      viewingDrawIdx: 0,
       danSize: 10,
       selectedNum: null,
-      customOverride: null,
       isLiveInternet: false,
       sourceName: 'Đang kết nối Internet...',
       weights: {},
       locked: {}
     };
 
+    // By default, selecting a preset locks the 10 individual sliders below
     ALGORITHMS.forEach(a => {
       state.weights[a.id] = a.defaultWeight;
-      state.locked[a.id] = false;
+      state.locked[a.id] = true;
     });
 
     let cachedDraws = [];
     let cachedEvaluation = null;
     let cachedPredictions = null;
+    let cachedPresetRanking = null;
 
-    // Fetch live lottery draws from the internet automatically
+    function updateClockBanner() {
+      const ck = getVietnamClockInfo();
+      const clockBadge = document.getElementById('vn-clock-badge');
+      const statusEl = document.getElementById('schedule-1835-status');
+      const countdownEl = document.getElementById('next-1835-countdown');
+      const targetEl = document.getElementById('target-predict-date');
+
+      if (clockBadge) clockBadge.textContent = `🕒 ${ck.timeStr} (GMT+7)`;
+      if (statusEl) {
+        if (ck.isAfter1835) {
+          statusEl.textContent = `✅ Đã qua 18h35 → Đã cập nhật KQXS hôm nay (${ck.todayStr})`;
+          statusEl.className = 'font-semibold text-emerald-400';
+        } else {
+          statusEl.textContent = `⏳ Chưa tới 18h35 → KQXS gần nhất là hôm qua (${ck.yesterdayStr})`;
+          statusEl.className = 'font-semibold text-amber-400';
+        }
+      }
+      if (countdownEl) {
+        countdownEl.textContent = ck.isAfter1835
+          ? `Quay kỳ tới (18h35 mai): còn ${ck.countdownStr}`
+          : `Đếm ngược 18h35 hôm nay: còn ${ck.countdownStr}`;
+      }
+      if (targetEl) {
+        targetEl.textContent = `Soi cho kỳ: ${ck.predictionTargetDate} (18h35)`;
+      }
+
+      if (!state.wasAfter1835 && ck.isAfter1835) {
+        state.wasAfter1835 = true;
+        syncFromInternet();
+      } else {
+        state.wasAfter1835 = ck.isAfter1835;
+      }
+    }
+
+    setInterval(updateClockBanner, 1000);
+
     async function syncFromInternet() {
+      updateClockBanner();
+      const ck = getVietnamClockInfo();
       const pill = document.getElementById('live-status-pill');
       const btn = document.getElementById('btn-sync-net');
       if (pill) {
-        pill.textContent = '🔄 Đang tải KQXS trực tiếp từ Internet...';
-        pill.className = 'px-2 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono';
+        pill.textContent = '🔄 Đang đồng bộ KQXS 18h35...';
+        pill.className = 'px-2.5 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono';
       }
       if (btn) btn.disabled = true;
 
@@ -238,14 +334,14 @@
         state.isLiveInternet = true;
         state.sourceName = res.source;
         state.dateStr = cachedDraws[0].date;
+        state.predictForDate = ck.predictionTargetDate;
         state.viewingDrawIdx = 0;
 
         if (pill) {
-          pill.textContent = '🟢 Trực tiếp Internet • Kỳ ' + cachedDraws[0].date;
-          pill.className = 'px-2 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono';
+          pill.textContent = `🟢 Đã cập nhật 18h35 • Kỳ ${cachedDraws[0].date}`;
+          pill.className = 'px-2.5 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono';
         }
       } catch (err) {
-        // Check localStorage cache first
         let loadedCache = null;
         try {
           const raw = localStorage.getItem('LOTO_AI_LIVE_CACHE_' + state.region);
@@ -253,23 +349,27 @@
         } catch (_) {}
 
         if (loadedCache && loadedCache.length > 0) {
-          cachedDraws = loadedCache;
+          const aligned = alignDrawsWith1835Cutoff(loadedCache, state.region, ck);
+          cachedDraws = aligned.draws;
           state.isLiveInternet = true;
-          state.sourceName = 'Bộ nhớ đệm Internet (' + cachedDraws[0].date + ')';
+          state.sourceName = 'Dữ liệu 18h35 (' + cachedDraws[0].date + ')';
           state.dateStr = cachedDraws[0].date;
         } else {
-          cachedDraws = buildHistoricalDraws(state.region, state.dateStr, state.customOverride);
+          cachedDraws = buildHistoricalDraws(state.region, ck.expectedLatestDrawDate, null);
           state.isLiveInternet = false;
-          state.sourceName = 'Chế độ Offline chuẩn hóa (' + cachedDraws[0].date + ')';
+          state.sourceName = 'Chuẩn hóa 18h35 (' + cachedDraws[0].date + ')';
+          state.dateStr = cachedDraws[0].date;
         }
         if (pill) {
-          pill.textContent = state.isLiveInternet ? ('🟢 Cache Internet • ' + state.dateStr) : ('⚡ Offline • ' + state.dateStr);
+          pill.textContent = `🟢 KQXS 18h35 • Kỳ ${state.dateStr}`;
+          pill.className = 'px-2.5 py-0.5 text-xs rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono';
         }
       } finally {
         if (btn) btn.disabled = false;
       }
 
       cachedEvaluation = evaluateAllNumbers(cachedDraws);
+      cachedPresetRanking = rankPresetStrategies(cachedDraws, 8, state.danSize);
       recomputeScoresOnly();
     }
 
@@ -283,6 +383,8 @@
 
     function updateWeight(changedId, newVal) {
       if (state.locked[changedId]) return;
+      state.activePresetId = 'custom';
+
       let lockedSum = 0;
       const unlockedIds = [];
       ALGORITHMS.forEach(a => {
@@ -328,19 +430,51 @@
       renderAlgorithmsPanel();
     }
 
-    function setPreset(type) {
-      ALGORITHMS.forEach(a => { state.locked[a.id] = false; });
-      if (type === 'default') ALGORITHMS.forEach(a => { state.weights[a.id] = a.defaultWeight; });
-      else if (type === 'equal') ALGORITHMS.forEach(a => { state.weights[a.id] = 10; });
-      else if (type === 'bridge') {
-        const map = { ema: 8, weibull: 8, markov: 10, bridge: 26, apriori: 22, gaussian: 5, fourier: 6, lstm: 5, chisquare: 4, shadow: 6 };
-        ALGORITHMS.forEach(a => { state.weights[a.id] = map[a.id]; });
-      } else if (type === 'ai') {
-        const map = { ema: 16, weibull: 14, markov: 24, bridge: 8, apriori: 8, gaussian: 5, fourier: 5, lstm: 14, chisquare: 4, shadow: 2 };
-        ALGORITHMS.forEach(a => { state.weights[a.id] = map[a.id]; });
-      }
+    function toggleUnlockAllSliders() {
+      const allLocked = ALGORITHMS.every(a => state.locked[a.id]);
+      ALGORITHMS.forEach(a => {
+        state.locked[a.id] = !allLocked;
+      });
+      renderAlgorithmsPanel();
+    }
+
+    /**
+     * When clicking any of the 6 Preset Algorithm Cards:
+     * 1. Apply its 100% weights
+     * 2. Proactively LOCK all 10 sliders below ("khi ấn vào các thuật toán trên thì chủ động khóa thanh dưới lại")
+     */
+    function setPreset(presetId) {
+      const found = PRESET_STRATEGIES.find(p => p.id === presetId);
+      if (!found) return;
+      state.activePresetId = presetId;
+      ALGORITHMS.forEach(a => {
+        state.weights[a.id] = found.weights[a.id];
+        state.locked[a.id] = true; // Auto-lock all 10 sliders below!
+      });
       state.selectedNum = null;
       recomputeScoresOnly();
+    }
+
+    function getActivePresetLabel() {
+      const p = PRESET_STRATEGIES.find(x => x.id === state.activePresetId);
+      return p ? `${p.icon} ${p.name}` : '⚙️ Tùy chỉnh riêng';
+    }
+
+    function openFavoriteMode() {
+      const inp = document.getElementById('fav-number-input');
+      if (inp) {
+        inp.focus();
+        inp.select();
+      }
+      calculateFavoriteNumber();
+    }
+
+    function calculateFavoriteNumber() {
+      const inp = document.getElementById('fav-number-input');
+      if (inp && inp.value.trim()) {
+        state.favoriteInput = inp.value.trim();
+      }
+      setMode('sobanket');
     }
 
     function changeRegion(reg) {
@@ -348,8 +482,8 @@
       ['xsmb', 'xsmn', 'xsmt'].forEach(r => {
         const btn = document.getElementById('reg-' + r);
         btn.className = r === reg
-          ? 'px-2.5 py-1 rounded-md font-semibold bg-blue-600 text-white transition'
-          : 'px-2.5 py-1 rounded-md font-medium text-slate-300 hover:text-white transition';
+          ? 'px-3 py-1.5 rounded-lg font-bold bg-blue-600 text-white transition'
+          : 'px-3 py-1.5 rounded-lg font-medium text-slate-300 hover:text-white transition';
       });
       state.selectedNum = null;
       syncFromInternet();
@@ -357,11 +491,27 @@
 
     function setMode(m) {
       state.mode = m;
-      ['ketqua', 'bachthu', 'songthu', 'danso', 'xien', 'matrix100', 'backtest'].forEach(id => {
+      const modes = ['ketqua', 'sobanket', 'bachthu', 'songthu', 'danso', 'xien', 'backtest'];
+      modes.forEach(id => {
         const btn = document.getElementById('mode-' + id);
-        btn.className = id === m
-          ? 'py-2 px-1.5 rounded-xl font-semibold bg-blue-600 text-white transition text-center'
-          : 'py-2 px-1.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 transition text-center';
+        if (!btn) return;
+        if (id === m) {
+          if (id === 'sobanket') {
+            btn.className = 'py-2.5 px-2 rounded-xl font-extrabold bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-lg shadow-rose-600/30 transition text-center scale-105';
+          } else if (id === 'backtest') {
+            btn.className = 'py-2.5 px-2 rounded-xl font-extrabold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30 transition text-center scale-105';
+          } else {
+            btn.className = 'py-2.5 px-2 rounded-xl font-extrabold bg-blue-600 text-white shadow-lg shadow-blue-600/30 transition text-center scale-105';
+          }
+        } else {
+          if (id === 'sobanket') {
+            btn.className = 'py-2.5 px-2 rounded-xl font-bold text-rose-300 bg-rose-950/40 border border-rose-500/40 hover:bg-rose-900/50 transition text-center';
+          } else if (id === 'backtest') {
+            btn.className = 'py-2.5 px-2 rounded-xl font-extrabold text-emerald-300 bg-emerald-950/50 border-2 border-emerald-500/60 hover:bg-emerald-900/60 transition text-center';
+          } else {
+            btn.className = 'py-2.5 px-2 rounded-xl font-semibold text-slate-300 hover:bg-slate-800 transition text-center';
+          }
+        }
       });
       renderModeContent();
     }
@@ -373,16 +523,21 @@
 
     function setDanSize(size) {
       state.danSize = parseInt(size, 10) || 10;
+      cachedPresetRanking = rankPresetStrategies(cachedDraws, 8, state.danSize);
       recomputeScoresOnly();
     }
 
     function inspectNum(numStr) {
       state.selectedNum = numStr;
+      const inp = document.getElementById('fav-number-input');
+      if (inp && state.mode === 'sobanket') {
+        inp.value = numStr;
+        state.favoriteInput = numStr;
+      }
       renderModeContent();
       renderSelectedNumberCard();
     }
 
-    // Helper to format a prize number with its last 2 digits highlighted
     function formatPrizeHighlight(pStr, isSpecial = false) {
       const s = String(pStr || '');
       if (s.length <= 2) {
@@ -394,6 +549,108 @@
     }
 
     function renderAlgorithmsPanel() {
+      const ranking = cachedPresetRanking || rankPresetStrategies(cachedDraws, 8, state.danSize);
+      const best = ranking.bestPreset;
+
+      // Update active preset labels
+      const activeLabel = getActivePresetLabel();
+      const bannerNameEl = document.getElementById('active-preset-banner-name');
+      if (bannerNameEl) bannerNameEl.textContent = activeLabel;
+      const favAlgBadge = document.getElementById('fav-active-alg-badge');
+      if (favAlgBadge) favAlgBadge.textContent = `Theo: ${activeLabel}`;
+
+      // Update Kiểm Chứng tab button label with best win rate
+      const btTabBtn = document.getElementById('mode-backtest');
+      if (btTabBtn) {
+        btTabBtn.innerHTML = `✅ Kiểm Chứng <span class="block text-xs font-mono text-amber-300">Đỉnh: ${best.backtest.danWinRate}%</span>`;
+      }
+
+      // Render Best Preset Suggestion Banner above the 6 cards
+      const suggEl = document.getElementById('best-preset-suggestion-banner');
+      if (suggEl) {
+        const isCurrentBest = state.activePresetId === best.id;
+        suggEl.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5">
+              <span class="px-2 py-0.5 rounded-md bg-emerald-500 text-slate-950 font-extrabold text-xs">👑 GỢI Ý TỪ KIỂM CHỨNG</span>
+              <span class="font-bold text-emerald-300">${best.icon} ${best.name}</span>
+            </div>
+            <span class="font-mono font-extrabold text-emerald-400 text-sm">Nổ ${best.backtest.danWinRate}% (${best.totalMatchedCount} nháy)</span>
+          </div>
+          <div class="flex items-center justify-between gap-2 pt-1">
+            <span class="text-slate-300">Đang có tỷ lệ ăn thực tế cao nhất trong 6 bộ thuật toán (Bạch thủ gợi ý: <b class="text-white font-mono">${best.topBachThu}</b>)</span>
+            ${isCurrentBest
+              ? `<span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold shrink-0">✓ Đang chọn</span>`
+              : `<button onclick="setPreset('${best.id}')" class="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold shrink-0 transition shadow">⚡ Chọn Ngay</button>`
+            }
+          </div>
+        `;
+      }
+
+      // Render 6 Large Elevated 3D Preset Cards
+      const gridEl = document.getElementById('preset-cards-grid');
+      if (gridEl) {
+        gridEl.innerHTML = ranking.presets.map(p => {
+          const isActive = state.activePresetId === p.id;
+          const isBest = p.isBest;
+          let cardStyle = 'bg-slate-950/90 border-slate-800 text-slate-300 hover:border-slate-600';
+          if (isActive && isBest) {
+            cardStyle = 'bg-gradient-to-br from-emerald-950 via-blue-950 to-slate-900 border-emerald-400 text-white preset-card-active best-glow';
+          } else if (isActive) {
+            cardStyle = 'bg-gradient-to-br from-blue-950 via-indigo-950 to-slate-900 border-blue-400 text-white preset-card-active';
+          } else if (isBest) {
+            cardStyle = 'bg-gradient-to-br from-emerald-950/80 to-slate-950 border-emerald-500/80 text-emerald-100 preset-card-best best-glow';
+          }
+
+          return `
+            <button onclick="setPreset('${p.id}')" class="preset-card relative p-3.5 rounded-2xl border-2 text-left flex flex-col justify-between gap-1.5 ${cardStyle}">
+              ${isBest ? `
+                <div class=" -mt-1 mb-0.5 flex items-center justify-between">
+                  <span class="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-emerald-400 text-slate-950 font-extrabold text-xs shadow">
+                    👑 NỔ NHIỀU NHẤT
+                  </span>
+                  <span class="font-mono font-extrabold text-xs text-emerald-400">${p.backtest.danWinRate}%</span>
+                </div>
+              ` : `
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-slate-400 font-mono">Tỷ lệ nổ dàn:</span>
+                  <span class="font-mono font-bold ${isActive ? 'text-blue-300' : 'text-slate-300'}">${p.backtest.danWinRate}% (${p.totalMatchedCount} nháy)</span>
+                </div>
+              `}
+              <div class="flex items-center gap-2">
+                <span class="text-2xl">${p.icon}</span>
+                <div>
+                  <div class="font-extrabold text-sm sm:text-base leading-tight text-white">${p.name}</div>
+                  <div class="text-xs ${isActive ? 'text-blue-200' : 'text-slate-400'} line-clamp-1">${p.subtitle}</div>
+                </div>
+              </div>
+              <div class="pt-1 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
+                <span>B.Thủ: <b class="text-amber-300">${p.topBachThu}</b> (${p.topBachThuPct}%)</span>
+                <span class="${isActive ? 'text-emerald-400 font-bold' : 'text-slate-500'}">${isActive ? '🔒 Đang dùng' : 'Chạm để chọn'}</span>
+              </div>
+            </button>
+          `;
+        }).join('');
+      }
+
+      // Update Lock status banner above 10 sliders
+      const allLocked = ALGORITHMS.every(a => state.locked[a.id]);
+      const lockLabel = document.getElementById('lock-status-label');
+      const unlockBtn = document.getElementById('btn-unlock-all');
+      if (lockLabel) {
+        if (allLocked) {
+          lockLabel.innerHTML = `🔒 Đã tự động khóa 10 thanh trượt theo <b>${activeLabel}</b>`;
+          lockLabel.className = 'font-semibold text-amber-400';
+        } else {
+          lockLabel.innerHTML = `🔓 Đang mở khóa thanh trượt (Tự điều chỉnh tỷ trọng %)`;
+          lockLabel.className = 'font-semibold text-blue-400';
+        }
+      }
+      if (unlockBtn) {
+        unlockBtn.textContent = allLocked ? '🔓 Mở khóa tự chỉnh %' : '🔒 Khóa tất cả lại';
+      }
+
+      // Stacked bar
       const bar = document.getElementById('weight-stacked-bar');
       bar.innerHTML = ALGORITHMS.map(a => {
         const w = state.weights[a.id];
@@ -409,7 +666,7 @@
         const w = state.weights[a.id];
         const isLocked = state.locked[a.id];
         return `
-          <div class="p-2 rounded-xl bg-slate-950/90 border ${isLocked ? 'border-amber-500/50' : 'border-slate-800'} text-xs space-y-1">
+          <div class="p-2 rounded-xl bg-slate-950/90 border ${isLocked ? 'border-amber-500/40 opacity-90' : 'border-blue-500/50'} text-xs space-y-1">
             <div class="flex items-center justify-between gap-1">
               <div class="flex items-center gap-1.5 truncate">
                 <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${a.color}"></span>
@@ -417,7 +674,7 @@
               </div>
               <div class="flex items-center gap-1.5">
                 <span class="font-mono font-bold text-slate-100 w-9 text-right">${w}%</span>
-                <button onclick="toggleLock('${a.id}')" class="px-1.5 py-0.5 rounded ${isLocked ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-800 text-slate-400'}">
+                <button onclick="toggleLock('${a.id}')" class="px-1.5 py-0.5 rounded ${isLocked ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-blue-600/20 text-blue-300 border border-blue-500/40'}">
                   ${isLocked ? '🔒' : '🔓'}
                 </button>
               </div>
@@ -443,9 +700,113 @@
       document.getElementById('base-draw-label').textContent = `${latest.date} (100 kỳ)`;
       document.getElementById('base-special-prize').textContent = latest.specialPrize;
       document.getElementById('base-first-prize').textContent = latest.firstPrize;
-      document.getElementById('data-source-label').textContent = state.sourceName;
+      updateClockBanner();
 
-      if (state.mode === 'ketqua') {
+      if (state.mode === 'sobanket') {
+        const favEval = evaluateFavoriteNumbers(cachedEvaluation, state.weights, state.favoriteInput || '68');
+        const activeLabel = getActivePresetLabel();
+
+        if (favEval.numbers.length === 0) {
+          panel.innerHTML = `
+            <div class="p-6 text-center space-y-2">
+              <div class="text-2xl">❤️</div>
+              <div class="font-bold text-base text-white">Hãy nhập con số bạn đang kết vào ô phía trên (VD: 68 hoặc 68, 86)</div>
+              <p class="text-xs text-slate-400">Hệ thống sẽ tính chính xác % xác suất nổ của số đó theo bộ thuật toán bạn chọn.</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Update selectedNum to first favorite number so bottom 10-algorithm inspector also shows it
+        state.selectedNum = favEval.numbers[0].num;
+
+        panel.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div>
+              <h3 class="font-extrabold text-base text-white flex items-center gap-2">
+                <span>❤️ Phân Tích Xác Suất Nổ Cho "Số Bạn Kết"</span>
+                <span class="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono text-xs">
+                  ${favEval.numbers.map(x => x.num).join(', ')}
+                </span>
+              </h3>
+              <p class="text-xs text-slate-400">Chấm điểm theo bộ thuật toán đang chọn: <b class="text-blue-400">${activeLabel}</b> (Bạn có thể bấm đổi bộ thuật toán bên trái để so sánh)</p>
+            </div>
+            ${favEval.numbers.length > 1 ? `
+              <div class="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 font-mono text-xs">
+                Điểm nổ trung bình nhóm số bạn kết: <b class="text-emerald-400 text-sm">${favEval.groupAvgPct}%</b>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="space-y-4">
+            ${favEval.numbers.map(f => {
+              const it = f.item;
+              const badgeColor = f.verdictColor === 'emerald'
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                : (f.verdictColor === 'blue' ? 'bg-blue-500/20 text-blue-300 border-blue-500/50' : 'bg-amber-500/20 text-amber-300 border-amber-500/50');
+
+              return `
+                <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-rose-950/30 border-2 border-rose-500/60 space-y-3 shadow-xl">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-3.5">
+                      <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-600 to-pink-600 flex items-center justify-center font-mono font-extrabold text-3xl text-white shadow-lg shadow-rose-600/30">
+                        ${f.num}
+                      </div>
+                      <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                          <span class="px-2.5 py-0.5 rounded-lg border font-extrabold text-xs ${badgeColor}">${f.verdict}</span>
+                          <span class="font-mono text-xs text-slate-300">Xếp hạng: <b class="text-white">#${it.rank} / 100 số</b></span>
+                        </div>
+                        <div class="text-2xl font-extrabold font-mono text-emerald-400">
+                          Xác suất nổ: ${it.finalScoreStr}%
+                        </div>
+                        <div class="text-xs text-slate-300 font-mono">
+                          Đánh cặp Song Thủ Đảo (<b>${f.num} - ${f.revNum}</b>): Xác suất nổ <b class="text-amber-300">${f.pairHitPct}%</b> (Số đảo ${f.revNum} đạt ${f.revItem.finalScoreStr}%)
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 font-mono text-xs text-center">
+                      <div class="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                        <div class="text-slate-400">Tần suất 30 kỳ</div>
+                        <div class="font-bold text-sm text-white">${it.hits30} nháy</div>
+                      </div>
+                      <div class="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                        <div class="text-slate-400">Chu kỳ Gan</div>
+                        <div class="font-bold text-sm text-amber-300">${it.daysAbsent} / ${it.avgCycle}d</div>
+                      </div>
+                      <div class="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                        <div class="text-slate-400">Cầu báo</div>
+                        <div class="font-bold text-sm text-blue-300">${it.bridgePos}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Comparison of this Favorite Number across all 6 Preset Algorithms -->
+                  <div class="pt-2 border-t border-slate-800/80 space-y-1.5">
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="font-semibold text-slate-300">📊 So sánh % nổ của số <b class="text-white font-mono">${f.num}</b> trên 6 Bộ Thuật Toán Tổng:</span>
+                      <span class="text-emerald-400 font-mono">Hợp nhất với: <b>${f.bestMatchingPreset.presetIcon} ${f.bestMatchingPreset.presetName} (${f.bestMatchingPreset.scoreStr}%)</b></span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-6 gap-1.5 text-xs font-mono">
+                      ${f.acrossPresets.map((ap, idx) => {
+                        const isCur = state.activePresetId === ap.presetId;
+                        return `
+                          <button onclick="setPreset('${ap.presetId}')" class="p-2 rounded-xl border text-left transition ${isCur ? 'bg-blue-950/80 border-blue-400 text-white' : (idx === 0 ? 'bg-emerald-950/60 border-emerald-500/60 text-emerald-200' : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700')}">
+                            <div class="truncate font-sans font-semibold text-xs">${ap.presetIcon} ${ap.presetName}</div>
+                            <div class="text-sm font-extrabold ${idx === 0 ? 'text-emerald-400' : 'text-white'}">${ap.scoreStr}%</div>
+                            <div class="text-xs text-slate-400">Hạng #${ap.rank}</div>
+                          </button>
+                        `;
+                      }).join('')}
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } else if (state.mode === 'ketqua') {
         const draw = cachedDraws[state.viewingDrawIdx] || latest;
         const pt = draw.prizeTable || {};
         const sp2Str = pad2(draw.special2);
@@ -465,14 +826,13 @@
         }
 
         panel.innerHTML = `
-          <!-- Draw Date Navigator -->
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
             <div>
               <h3 class="font-bold text-sm text-white flex items-center gap-2">
                 <span>📋 Bảng Kết Quả Xổ Số ${state.region.toUpperCase()}</span>
                 <span class="px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30 font-mono text-xs">Ngày ${draw.date}</span>
               </h3>
-              <p class="text-xs text-slate-400">Nguồn: ${draw.source || state.sourceName} • Chạm vào số Loto để xem AI phân tích</p>
+              <p class="text-xs text-slate-400">Nguồn: ${draw.source || state.sourceName} • Chạm vào số bất kỳ để xem % nổ kỳ tới</p>
             </div>
             <div class="flex items-center gap-1 text-xs font-mono">
               <button onclick="selectDrawIndex(${state.viewingDrawIdx + 1})" ${state.viewingDrawIdx >= cachedDraws.length - 1 ? 'disabled' : ''} class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40">◀ Kỳ trước</button>
@@ -483,10 +843,7 @@
             </div>
           </div>
 
-          <!-- 2-Column Result Board: Full 27 Prizes Table (Left) + Loto Đầu/Đuôi Table (Right) -->
           <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
-            
-            <!-- Left: Traditional Prize Board (7 cols) -->
             <div class="md:col-span-7 rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
               <div class="bg-slate-900 px-3 py-1.5 border-b border-slate-800 flex justify-between text-xs font-semibold text-slate-300">
                 <span>Giải thưởng (${draw.prizes.length} giải)</span>
@@ -513,7 +870,6 @@
               </div>
             </div>
 
-            <!-- Right: Bảng Loto Đầu - Đuôi 0..9 (5 cols) -->
             <div class="md:col-span-5 rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
               <div class="bg-slate-900 px-3 py-1.5 border-b border-slate-800 flex justify-between text-xs font-semibold text-slate-300">
                 <span>Bảng Loto Đầu (0–9)</span>
@@ -521,7 +877,6 @@
               </div>
               <div class="divide-y divide-slate-800/80 text-xs font-mono">
                 ${draw.lotoByHead.map((arr, headDigit) => {
-                  // Count duplicates for multi-hit badge
                   const counts = {};
                   arr.forEach(n => { counts[n] = (counts[n] || 0) + 1; });
                   const uniqueNums = Object.keys(counts).sort();
@@ -548,7 +903,6 @@
                 }).join('')}
               </div>
             </div>
-
           </div>
         `;
       } else if (state.mode === 'bachthu') {
@@ -559,7 +913,7 @@
         panel.innerHTML = `
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
             <div>
-              <h3 class="font-bold text-sm text-white">🎯 Chốt Bạch Thủ Lô / Đề Kỳ Kế Tiếp (1 Số Đỉnh Hội Tụ)</h3>
+              <h3 class="font-bold text-sm text-white">🎯 Chốt Bạch Thủ Lô / Đề Kỳ Kế Tiếp (${getActivePresetLabel()})</h3>
               <p class="text-xs text-slate-400">Tính toán trực tiếp từ kỳ gốc ${latest.date} (ĐB: ${latest.specialPrize})</p>
             </div>
             <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono font-bold text-xs">
@@ -615,7 +969,7 @@
 
         panel.innerHTML = `
           <div class="border-b border-slate-800 pb-2">
-            <h3 class="font-bold text-sm text-white">⚖️ Chốt Song Thủ Lô (Cặp Đối Xứng & Cặp Độc Lập)</h3>
+            <h3 class="font-bold text-sm text-white">⚖️ Chốt Song Thủ Lô (${getActivePresetLabel()})</h3>
             <p class="text-xs text-slate-400">Tính xác suất hợp nhất khi đánh cặp 2 số bổ trợ nhau</p>
           </div>
 
@@ -678,7 +1032,7 @@
         panel.innerHTML = `
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
             <div>
-              <h3 class="font-bold text-sm text-white">🔢 Chốt Dàn Số Tùy Chọn (${d.size} Số Chuẩn Nhất)</h3>
+              <h3 class="font-bold text-sm text-white">🔢 Chốt Dàn Số Tùy Chọn (${d.size} Số • ${getActivePresetLabel()})</h3>
               <p class="text-xs text-slate-400">Lọc tự động ${d.size} số có điểm tổng hợp cao nhất từ 100 số (00–99)</p>
             </div>
             <div class="flex items-center gap-2 font-mono text-xs">
@@ -769,62 +1123,99 @@
             </div>
           </div>
         `;
-      } else if (state.mode === 'matrix100') {
-        const all100 = [...p.ranked].sort((a, b) => a.numInt - b.numInt);
-        panel.innerHTML = `
-          <div class="border-b border-slate-800 pb-2">
-            <h3 class="font-bold text-sm text-white">📊 Bảng Nhiệt Độ Xác Suất Toàn Bộ 100 Số (00 – 99)</h3>
-          </div>
-          <div class="grid grid-cols-10 gap-1 text-xs font-mono max-h-[260px] overflow-y-auto p-0.5">
-            ${all100.map(item => {
-              let bg = 'bg-slate-950 border-slate-800 text-slate-300';
-              if (item.rank <= 3) bg = 'bg-emerald-950/90 border-emerald-500 text-emerald-300 font-bold';
-              else if (item.rank <= 10) bg = 'bg-blue-950/80 border-blue-500/60 text-blue-200 font-semibold';
-              const isSel = state.selectedNum === item.num ? 'ring-2 ring-amber-400' : '';
-              return `
-                <button onclick="inspectNum('${item.num}')" class="p-1 rounded-lg border text-center transition ${bg} ${isSel}">
-                  <div>${item.num}</div>
-                  <div class="opacity-80">${item.finalScore.toFixed(0)}%</div>
-                </button>
-              `;
-            }).join('')}
-          </div>
-        `;
       } else if (state.mode === 'backtest') {
+        const ranking = cachedPresetRanking || rankPresetStrategies(cachedDraws, 8, state.danSize);
+        const best = ranking.bestPreset;
         const bt = runHistoricalBacktest(cachedDraws, state.weights, 8, state.danSize);
+        const totalNhay = bt.history.reduce((acc, r) => acc + r.danMatched.length, 0);
+
         panel.innerHTML = `
-          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
-            <div>
-              <h3 class="font-bold text-sm text-white">✅ Kiểm Chứng Lịch Sử Trên Dữ Liệu Thật</h3>
-              <p class="text-xs text-slate-400">Đối chiếu công thức % hiện tại trên ${bt.daysTested} kỳ quay gần nhất</p>
+          <!-- Prominent Best Algorithm Recommendation Banner inside Kiểm Chứng -->
+          <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 border-2 border-emerald-400 shadow-xl space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-emerald-400 text-slate-950 font-extrabold text-xs shadow">
+                  👑 THUẬT TOÁN ĐANG NỔ NHIỀU NHẤT
+                </span>
+                <span class="font-extrabold text-base sm:text-lg text-white">${best.icon} ${best.name}</span>
+              </div>
+              <button onclick="setPreset('${best.id}')" class="px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg transition transform hover:-translate-y-0.5">
+                ${state.activePresetId === best.id ? '✓ Đang Áp Dụng Bộ Này' : '⚡ Áp Dụng Ngay Bộ Thuật Toán Này'}
+              </button>
             </div>
-            <span class="px-2 py-1 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono text-xs">
-              Tỷ lệ nổ Dàn ${state.danSize}: <b>${bt.danWinRate}%</b>
-            </span>
+            <p class="text-xs sm:text-sm text-emerald-200">
+              Qua kiểm chứng ${best.backtest.daysTested} kỳ liên tiếp gần đây, bộ <b>${best.name}</b> đạt tỷ lệ nổ Dàn ${state.danSize} số cao nhất (<b>${best.backtest.danWinRate}%</b>, ăn tổng cộng <b>${best.totalMatchedCount} nháy</b>) và gợi ý Bạch Thủ kỳ tới là <b class="text-amber-300 font-mono text-base">${best.topBachThu} (${best.topBachThuPct}%)</b>.
+            </p>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-xs font-mono">
-              <thead>
-                <tr class="border-b border-slate-800 text-slate-400">
-                  <th class="py-1.5 px-2">Kỳ quay</th>
-                  <th class="py-1.5 px-2">ĐB Thực tế</th>
-                  <th class="py-1.5 px-2">Bạch Thủ AI</th>
-                  <th class="py-1.5 px-2">Song Thủ AI</th>
-                  <th class="py-1.5 px-2">Số nổ trong Dàn ${state.danSize}</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-800/60">
-                ${bt.history.map(row => `
-                  <tr>
-                    <td class="py-1.5 px-2 text-slate-300">${row.date}</td>
-                    <td class="py-1.5 px-2 text-rose-400 font-bold">${row.actualSpecial}</td>
-                    <td class="py-1.5 px-2 ${row.bachThuHit > 0 ? 'text-emerald-400 font-bold' : 'text-slate-400'}">${row.bachThuNum} ${row.bachThuHit > 0 ? `✓` : ''}</td>
-                    <td class="py-1.5 px-2 ${row.songThuHit > 0 ? 'text-emerald-400 font-bold' : 'text-slate-400'}">${row.songThuLabel} ${row.songThuHit > 0 ? `✓` : ''}</td>
-                    <td class="py-1.5 px-2">${row.danMatched.length > 0 ? `<span class="text-emerald-400 font-bold">Ăn ${row.danMatched.join(', ')}</span>` : `<span class="text-slate-500">-</span>`}</td>
+
+          <!-- 6 Preset Algorithms Leaderboard Comparison -->
+          <div class="space-y-1.5">
+            <div class="text-xs font-bold text-slate-300">📊 Bảng So Sánh Hiệu Suất Thực Tế Của 6 Bộ Thuật Toán Tổng (Chạm để đổi bộ thuật toán):</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+              ${ranking.presets.map(pr => {
+                const isAct = state.activePresetId === pr.id;
+                return `
+                  <button onclick="setPreset('${pr.id}')" class="p-3 rounded-xl border-2 text-left transition ${pr.isBest ? 'bg-emerald-950/70 border-emerald-400 shadow-lg' : (isAct ? 'bg-blue-950/70 border-blue-400' : 'bg-slate-950 border-slate-800 hover:border-slate-700')}">
+                    <div class="flex items-center justify-between">
+                      <span class="font-extrabold text-white">${pr.icon} ${pr.name}</span>
+                      ${pr.isBest ? `<span class="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-extrabold text-xs">TOP 1</span>` : ''}
+                    </div>
+                    <div class="mt-1 flex items-baseline justify-between font-mono">
+                      <span class="text-lg font-extrabold text-emerald-400">Nổ ${pr.backtest.danWinRate}%</span>
+                      <span class="text-slate-300">${pr.totalMatchedCount} nháy</span>
+                    </div>
+                    <div class="text-xs text-slate-400 font-mono mt-0.5">Số kết: <b class="text-amber-300">${pr.topBachThu}</b> • S.Thủ: ${pr.topSongThu}</div>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Detailed Backtest Table for Current Active Algorithm -->
+          <div class="space-y-2 pt-1">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+              <div>
+                <h3 class="font-extrabold text-sm sm:text-base text-white">✅ Chi Tiết Từng Kỳ Quay Của Bộ Đang Chọn: <span class="text-blue-400">${getActivePresetLabel()}</span></h3>
+              </div>
+              <div class="flex gap-2 font-mono text-xs">
+                <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+                  Tỷ lệ nổ Dàn ${state.danSize}: ${bt.danWinRate}% (Tổng ${totalNhay} nháy)
+                </span>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs sm:text-sm font-mono">
+                <thead>
+                  <tr class="border-b border-slate-800 text-slate-400 bg-slate-950/60">
+                    <th class="py-2 px-2.5">Kỳ quay</th>
+                    <th class="py-2 px-2.5">ĐB Thực tế</th>
+                    <th class="py-2 px-2.5">Bạch Thủ AI</th>
+                    <th class="py-2 px-2.5">Song Thủ AI</th>
+                    <th class="py-2 px-2.5">Kết quả nổ trong Dàn ${state.danSize} số</th>
                   </tr>
-                `).join('')}
-              </tbody>
-            </table>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60">
+                  ${bt.history.map(row => `
+                    <tr class="hover:bg-slate-800/30">
+                      <td class="py-2 px-2.5 text-slate-200 font-semibold">${row.date}</td>
+                      <td class="py-2 px-2.5 text-rose-400 font-extrabold">${row.actualSpecial}</td>
+                      <td class="py-2 px-2.5 ${row.bachThuHit > 0 ? 'text-emerald-400 font-extrabold' : 'text-slate-400'}">
+                        ${row.bachThuNum} ${row.bachThuHit > 0 ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">✓ Nổ ${row.bachThuHit}</span>` : ''}
+                      </td>
+                      <td class="py-2 px-2.5 ${row.songThuHit > 0 ? 'text-emerald-400 font-extrabold' : 'text-slate-400'}">
+                        ${row.songThuLabel} ${row.songThuHit > 0 ? `<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">✓ Nổ ${row.songThuHit}</span>` : ''}
+                      </td>
+                      <td class="py-2 px-2.5">
+                        ${row.danMatched.length > 0
+                          ? `<span class="px-2 py-0.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-extrabold">🔥 Ăn ${row.danMatched.join(', ')} (${row.danMatched.length} số)${row.hitDe ? ' • TRÚNG ĐB 🎯' : ''}</span>`
+                          : `<span class="text-slate-500">Chưa nổ</span>`}
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
           </div>
         `;
       }
@@ -839,7 +1230,7 @@
           <div class="flex items-center gap-2.5">
             <span class="px-3 py-1 rounded-xl bg-blue-600 text-white font-mono font-extrabold text-xl">${item.num}</span>
             <div>
-              <div class="font-bold text-sm text-white">Chi Tiết 10 Thuật Toán Chấm Điểm Số ${item.num} (Hạng #${item.rank}/100)</div>
+              <div class="font-bold text-sm text-white">Chi Tiết 10 Thuật Toán Chấm Điểm Số ${item.num} (Hạng #${item.rank}/100 • ${getActivePresetLabel()})</div>
               <div class="text-xs text-slate-400">
                 Cầu vị trí: <b class="text-slate-200">${item.bridgePos}</b> • Markov từ <b class="text-slate-200">${item.markovFrom}</b> • Gan <b class="text-slate-200">${item.daysAbsent}d</b> (Chu kỳ TB ${item.avgCycle}d)
               </div>
@@ -893,9 +1284,10 @@
       const reg = match[1].toLowerCase();
       const parts = match[5].split('.').map(x => parseInt(x, 10) || 0);
       if (parts.length !== ALGORITHMS.length) return alert('Số lượng thuật toán không khớp!');
+      state.activePresetId = 'custom';
       ALGORITHMS.forEach((a, idx) => {
         state.weights[a.id] = parts[idx];
-        state.locked[a.id] = false;
+        state.locked[a.id] = true;
       });
       changeRegion(reg);
     }
@@ -908,35 +1300,6 @@
       }
     }
 
-    function toggleCustomModal() {
-      const m = document.getElementById('custom-kq-modal');
-      m.classList.toggle('hidden');
-      if (!m.classList.contains('hidden') && cachedEvaluation) {
-        document.getElementById('inp-special').value = cachedEvaluation.latestDraw.specialPrize;
-        document.getElementById('inp-first').value = cachedEvaluation.latestDraw.firstPrize;
-      }
-    }
-
-    function applyCustomResult() {
-      const sp = document.getElementById('inp-special').value.trim();
-      const fp = document.getElementById('inp-first').value.trim();
-      const lotosRaw = document.getElementById('inp-lotos').value.trim();
-      const extraLotos = lotosRaw ? lotosRaw.split(/[\s,;]+/).map(x => parseInt(x, 10)).filter(x => !isNaN(x)) : [];
-      state.customOverride = { specialPrize: sp, firstPrize: fp, extraLotos };
-      toggleCustomModal();
-      cachedDraws = buildHistoricalDraws(state.region, state.dateStr, state.customOverride);
-      state.sourceName = 'KQXS người dùng nhập trực tiếp';
-      cachedEvaluation = evaluateAllNumbers(cachedDraws);
-      recomputeScoresOnly();
-    }
-
-    function resetCustomResult() {
-      state.customOverride = null;
-      toggleCustomModal();
-      syncFromInternet();
-    }
-
-    // Automatically fetch real lottery results from the Internet on startup!
     syncFromInternet();
   </script>
 </body>
